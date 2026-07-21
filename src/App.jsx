@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // -------------------- Mock data --------------------
+// The calendar holds a whole month; only CAL_WINDOW days sit on screen at once
+// and scrolling slides that window one day at a time.
+const CAL_TODAY_DAY = 17;
+const CAL_COLOR_CYCLE = ['green', 'yellow', 'green', 'green', 'yellow', 'red', 'green'];
+const CAL_COLOR_OVERRIDES = {
+  14: 'yellow',
+  15: 'green',
+  16: 'green',
+  17: 'green',
+  18: 'yellow',
+  19: 'yellow',
+  20: 'red',
+};
+
+function buildCalendar() {
+  return Array.from({ length: 31 }, (_, i) => {
+    const day = i + 1;
+    return {
+      date: `July ${day}`,
+      color:
+        CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length],
+      today: day === CAL_TODAY_DAY,
+    };
+  });
+}
+
 const mockData = {
   pulse: {
     status: 'Healthy',
@@ -12,15 +38,7 @@ const mockData = {
       { id: 2, text: 'Schedule meeting with Brian', done: false },
       { id: 3, text: 'Review quarterly data with Rahmi', done: false },
     ],
-    calendar: [
-      { date: 'July 14', color: 'yellow' },
-      { date: 'July 15', color: 'green' },
-      { date: 'July 16', color: 'green' },
-      { date: 'July 17', color: 'green', today: true },
-      { date: 'July 18', color: 'yellow' },
-      { date: 'July 19', color: 'yellow' },
-      { date: 'July 20', color: 'red' },
-    ],
+    calendar: buildCalendar(),
   },
   canvas: {
     workspace: 'Agency',
@@ -68,17 +86,21 @@ const BAR_COLORS = {
   red: { active: C.red, faded: '#f5a58f' },
 };
 
-// Bar width tapers by distance from Today (index) — Today is widest, edges narrowest.
-const TODAY_IDX = mockData.pulse.calendar.findIndex((d) => d.today);
+const CAL_DAYS = mockData.pulse.calendar;
+const TODAY_IDX = CAL_DAYS.findIndex((d) => d.today);
+
+// Seven days on screen at a time; the middle slot is the focal one.
+const CAL_WINDOW = 7;
+const CAL_CENTER = (CAL_WINDOW - 1) / 2;
+const CAL_MAX_START = Math.max(0, CAL_DAYS.length - CAL_WINDOW);
+const CAL_ROW_PITCH = 48; // row height + gap — converts drag distance into days
+
+const clampCalStart = (i) => Math.max(0, Math.min(CAL_MAX_START, i));
+
+// Bar width tapers by distance from the centered slot — center widest, edges narrowest.
 const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
-
-// Header month follows the day marked Today, falling back to the first day shown.
-const CAL_MONTH = (
-  mockData.pulse.calendar[TODAY_IDX] ?? mockData.pulse.calendar[0]
-)?.date.split(' ')[0];
-
-function barPx(i) {
-  const dist = Math.abs(i - TODAY_IDX);
+function barPx(slot) {
+  const dist = Math.abs(slot - CAL_CENTER);
   return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
 }
 
@@ -151,11 +173,14 @@ export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
+  // Index of the first day in the visible 7-day calendar window.
+  const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-  const calendarRef = useRef(null);
   const canvasScrollRef = useRef(null);
+
+  const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
 
   const toggleTodo = (id) =>
     setTodos((prev) =>
@@ -188,7 +213,7 @@ export default function App() {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
-          calendarRef.current?.scrollBy({ top: dir * 44, behavior: 'smooth' });
+          stepCal(dir);
         } else {
           canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
@@ -221,7 +246,8 @@ export default function App() {
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
             toggleTodo={toggleTodo}
-            calendarRef={calendarRef}
+            calStart={calStart}
+            stepCal={stepCal}
           />
         ) : (
           <CanvasScreen scrollRef={canvasScrollRef} />
@@ -253,8 +279,42 @@ function PulseScreen({
   focusIdx,
   setFocusIdx,
   toggleTodo,
-  calendarRef,
+  calStart,
+  stepCal,
 }) {
+  // Wheel and drag both accumulate distance and spend it a whole day at a time,
+  // so the window never lands between days.
+  const wheelAcc = useRef(0);
+  const dragFrom = useRef(null);
+
+  const onWheel = (e) => {
+    wheelAcc.current += e.deltaY;
+    const days = Math.trunc(wheelAcc.current / CAL_ROW_PITCH);
+    if (days) {
+      wheelAcc.current -= days * CAL_ROW_PITCH;
+      stepCal(days);
+    }
+  };
+
+  const onCalTouchStart = (e) => {
+    dragFrom.current = e.touches[0].clientY;
+  };
+  const onCalTouchMove = (e) => {
+    if (dragFrom.current == null) return;
+    const dy = dragFrom.current - e.touches[0].clientY; // drag up → later days
+    const days = Math.trunc(dy / CAL_ROW_PITCH);
+    if (days) {
+      dragFrom.current -= days * CAL_ROW_PITCH;
+      stepCal(days);
+    }
+  };
+  const onCalTouchEnd = () => {
+    dragFrom.current = null;
+  };
+
+  const visible = CAL_DAYS.slice(calStart, calStart + CAL_WINDOW);
+  const month = (visible[CAL_CENTER] ?? CAL_DAYS[0])?.date.split(' ')[0];
+
   return (
     <div style={S.pulse}>
       <div style={S.pageLabel}>Pulse</div>
@@ -353,7 +413,7 @@ function PulseScreen({
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
               <IconChevron dir="left" size={11} />
-              <span style={S.monthName}>{CAL_MONTH}</span>
+              <span style={S.monthName}>{month}</span>
               <IconChevron dir="right" size={11} />
             </div>
             <div style={S.viewToggle}>
@@ -366,18 +426,26 @@ function PulseScreen({
             </div>
           </div>
 
-          <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
-            {mockData.pulse.calendar.map((d, i) => {
+          <div
+            style={S.calendarBody}
+            onWheel={onWheel}
+            onTouchStart={onCalTouchStart}
+            onTouchMove={onCalTouchMove}
+            onTouchEnd={onCalTouchEnd}
+          >
+            {visible.map((d, slot) => {
               const bar = BAR_COLORS[d.color];
-              const isPast = TODAY_IDX >= 0 && i < TODAY_IDX;
+              const isPast = TODAY_IDX >= 0 && calStart + slot < TODAY_IDX;
               const fill = isPast ? bar.faded : bar.active;
+              // The centered day carries the emphasis, Today included.
+              const isCenter = slot === CAL_CENTER;
               return (
                 <div key={d.date} style={S.calRow}>
                   <div
                     style={{
                       ...S.calDate,
-                      color: d.today ? C.text : '#c9c9c9',
-                      fontWeight: d.today ? 700 : 500,
+                      color: isCenter ? C.text : '#c9c9c9',
+                      fontWeight: isCenter ? 700 : 500,
                     }}
                   >
                     {d.today ? 'Today' : d.date}
@@ -385,8 +453,8 @@ function PulseScreen({
                   <div
                     style={{
                       ...S.calBar,
-                      width: barPx(i),
-                      height: d.today ? 48 : 40,
+                      width: barPx(slot),
+                      height: isCenter ? 48 : 40,
                       background: fill,
                     }}
                   />
@@ -691,13 +759,15 @@ const S = {
     flexDirection: 'column',
     justifyContent: 'center',
     gap: 8,
-    overflowY: 'auto',
+    overflow: 'hidden',
+    touchAction: 'none', // the window is stepped by hand, not natively scrolled
   },
   calRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    flexShrink: 0,
   },
   calDate: {
     fontSize: 12,
