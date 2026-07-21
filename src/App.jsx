@@ -125,6 +125,24 @@ const mockData = {
     ],
     calendar: buildCalendar(),
   },
+  sage: {
+    tagline: 'Intelligence layer for design operations',
+    intro: {
+      lead: 'Sage is active. I maintain shared understanding across your goals, decisions, and revisions so your team stays aligned as work evolves.',
+      listLead: 'I can help you:',
+      bullets: [
+        'Surface and classify feedback across the project',
+        'Flag when work has drifted from stated intent',
+        'Log and retrieve key decisions as they’re made',
+        'Execute canvas actions through natural language',
+      ],
+    },
+    history: [
+      { id: 1, title: 'One of the stakeholders on the Puma inv…', date: '6/12/2026' },
+      { id: 2, title: 'Summarise the Creator Day feedback', date: '6/9/2026' },
+      { id: 3, title: 'What changed on Vega Launch Deck?', date: '5/28/2026' },
+    ],
+  },
   canvas: {
     workspace: 'Agency',
     projects: [
@@ -282,6 +300,44 @@ const IconX = ({ size = 12 }) => (
   </svg>
 );
 
+const IconMenu = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <path
+      d="M2 4 H12 M2 7 H9 M2 10 H6"
+      stroke={C.text}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconSend = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <path
+      d="M12.2 1.8 L1.6 5.9 L6.1 7.9 L8.1 12.4 Z"
+      stroke={C.textMedium}
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+// Sage's mark: a dotted cluster on a black disc.
+const SageMark = ({ size = 34 }) => (
+  <svg width={size} height={size} viewBox="0 0 34 34">
+    <circle cx="17" cy="17" r="17" fill="#0a0a0a" />
+    {[
+      [12, 11], [17, 11], [22, 11],
+      [12, 15.5], [17, 15.5], [22, 15.5],
+      [12, 20], [17, 20], [22, 20],
+      [14.5, 24], [19.5, 24],
+    ].map(([x, y], i) => (
+      <circle key={i} cx={x} cy={y} r="1.5" fill="#3d3d3d" />
+    ))}
+  </svg>
+);
+
 const IconGrid = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
     <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
@@ -307,7 +363,8 @@ const IconList = ({ size = 12 }) => (
 
 // -------------------- Component --------------------
 export default function App() {
-  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
+  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas, 2=sage
+  const [messages, setMessages] = useState(SAGE_OPENING);
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
   // See All covers the whole frame with the full to-do list; the calendar's
@@ -326,6 +383,24 @@ export default function App() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   const canvasScrollRef = useRef(null);
+  const chatScrollRef = useRef(null);
+
+  // Replies are canned — there's no model behind the kiosk, this is the shape
+  // of the exchange rather than a real one.
+  const sendMessage = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    setMessages((m) => [
+      ...m,
+      { id: m.length, from: 'user', text: t },
+      {
+        id: m.length + 1,
+        from: 'sage',
+        text: SAGE_REPLIES[m.filter((x) => x.from === 'user').length % SAGE_REPLIES.length],
+      },
+    ]);
+  };
+  const newChat = () => setMessages(SAGE_OPENING);
 
   const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
   const centerCal = (idx) => setCalStart(clampCalStart(idx - CAL_CENTER));
@@ -387,8 +462,8 @@ export default function App() {
         if (dx > 0) setTodosOpen(false);
       } else if (monthOpen) {
         if (dx > 0) setMonthOpen(false);
-      } else if (dx < 0) setScreen(1);
-      else setScreen(0);
+      } else if (dx < 0) setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
+      else setScreen((s) => Math.max(0, s - 1));
     }
     touchStartX.current = null;
     touchStartY.current = null;
@@ -396,6 +471,10 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      // Don't steal keys from the chat input — arrows would swipe pages and
+      // Enter would toggle a to-do instead of sending.
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (todosOpen) {
         if (e.key === 'Escape' || e.key === 'ArrowLeft') setTodosOpen(false);
         else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -413,15 +492,17 @@ export default function App() {
         if (e.key === 'Escape' || e.key === 'ArrowLeft') setMonthOpen(false);
         return;
       }
-      if (e.key === 'ArrowLeft') setScreen(0);
-      else if (e.key === 'ArrowRight') setScreen(1);
+      if (e.key === 'ArrowLeft') setScreen((s) => Math.max(0, s - 1));
+      else if (e.key === 'ArrowRight')
+        setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           stepCal(dir);
         } else {
-          canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
+          const ref = screen === 1 ? canvasScrollRef : chatScrollRef;
+          ref.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
@@ -475,15 +556,22 @@ export default function App() {
             onSeeAll={() => setTodosOpen(true)}
             onOpenMonth={() => setMonthOpen(true)}
           />
-        ) : (
+        ) : screen === 1 ? (
           <CanvasScreen scrollRef={canvasScrollRef} />
+        ) : (
+          <SageScreen
+            messages={messages}
+            onSend={sendMessage}
+            onNewChat={newChat}
+            scrollRef={chatScrollRef}
+          />
         )}
 
         {/* The dots page between Pulse and Canvases. The full-frame pages are
             not among them, so the dots hide while one is up. */}
         {!todosOpen && !monthOpen && (
           <div style={S.dots}>
-            {[0, 1].map((i) => (
+            {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 onClick={() => setScreen(i)}
@@ -752,6 +840,117 @@ function PulseScreen({
   );
 }
 
+// -------------------- Sage screen --------------------
+// Third swipe page. The reference is a two-pane desktop layout; at 480x480 the
+// history sidebar becomes a slide-over behind the hamburger.
+function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
+  const [draft, setDraft] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const sage = mockData.sage;
+
+  // Keep the newest message in view as the thread grows.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, scrollRef]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSend(draft);
+    setDraft('');
+  };
+
+  return (
+    <div style={S.sagePage}>
+      <div style={S.sageHeader}>
+        <div style={S.sageIconBtn} onClick={() => setHistoryOpen(true)}>
+          <IconMenu size={14} />
+        </div>
+        <SageMark size={34} />
+        <div style={S.sageTitleBlock}>
+          <div style={S.sageName}>Sage</div>
+          <div style={S.sageTagline}>{sage.tagline}</div>
+        </div>
+        <div style={S.sageIconBtn} onClick={onNewChat}>
+          <IconPlus size={13} />
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="kiosk-scroll" style={S.sageThread}>
+        {messages.map((m) =>
+          m.from === 'user' ? (
+            <div key={m.id} style={S.userRow}>
+              <div style={S.userBubble}>{m.text}</div>
+            </div>
+          ) : (
+            <div key={m.id} style={S.sageRow}>
+              <SageMark size={22} />
+              <div style={S.sageBubble}>
+                {m.intro ? (
+                  <>
+                    <div style={S.sageLead}>{sage.intro.lead}</div>
+                    <div style={S.sageListLead}>{sage.intro.listLead}</div>
+                    {sage.intro.bullets.map((b) => (
+                      <div key={b} style={S.sageBullet}>
+                        <span style={S.sageDot} />
+                        <span>{b}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  m.text
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+
+      <form style={S.composer} onSubmit={submit}>
+        <input
+          style={S.composerInput}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Ask Sage anything..."
+        />
+        <button type="submit" style={S.sendBtn}>
+          <IconSend size={14} />
+        </button>
+      </form>
+
+      {historyOpen && (
+        <>
+          <div style={S.historyScrim} onClick={() => setHistoryOpen(false)} />
+          <div style={S.historyPanel}>
+            <div style={S.historyHead}>
+              <span style={S.historyTitle}>Chat History</span>
+              <span
+                style={S.historyNew}
+                onClick={() => {
+                  onNewChat();
+                  setHistoryOpen(false);
+                }}
+              >
+                + New
+              </span>
+            </div>
+            {sage.history.map((h) => (
+              <div
+                key={h.id}
+                style={S.historyItem}
+                onClick={() => setHistoryOpen(false)}
+              >
+                <div style={S.historyItemTitle}>{h.title}</div>
+                <div style={S.historyItemDate}>{h.date}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // -------------------- Month page --------------------
 // Behind the calendar card's grid toggle. Monday-first month grid, one circle
 // per day coloured by that day's health.
@@ -810,6 +1009,15 @@ function MonthScreen({ onClose, onPickDay }) {
 // -------------------- To-Dos page --------------------
 // The full list, behind the Pulse card's See All. Covers the whole frame, so
 // it carries its own way back rather than relying on the dots.
+const SCREEN_COUNT = 3; // pulse, canvases, sage
+
+const SAGE_OPENING = [{ id: 0, from: 'sage', intro: true }];
+const SAGE_REPLIES = [
+  'Logged. I’ll track that against the project’s stated intent and flag drift as it appears.',
+  'Noted — I’ve tied that to the current canvas so the decision stays retrievable.',
+  'Classified as scope feedback. It’ll surface in the next digest for the team.',
+];
+
 const TODO_FILTERS = ['All', 'Open', 'Done'];
 
 const ANY_CANVAS = 'All Canvases';
@@ -1259,6 +1467,199 @@ const S = {
     color: C.textMuted,
     fontWeight: 500,
     cursor: 'pointer',
+  },
+
+  // ---- Sage screen ----
+  sagePage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    paddingBottom: 24,
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  sageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+    flexShrink: 0,
+  },
+  sageIconBtn: {
+    width: 22,
+    height: 22,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  sageTitleBlock: { flex: 1, minWidth: 0 },
+  sageName: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.3px',
+    lineHeight: 1.15,
+  },
+  sageTagline: {
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
+    lineHeight: 1.2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+
+  sageThread: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
+    padding: '12px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  sageRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    flexShrink: 0,
+  },
+  sageBubble: {
+    flex: 1,
+    minWidth: 0,
+    background: '#ededed',
+    borderRadius: 12,
+    padding: '10px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.45,
+    color: C.textMedium,
+  },
+  sageLead: { marginBottom: 8 },
+  sageListLead: { marginBottom: 5 },
+  sageBullet: {
+    display: 'flex',
+    gap: 7,
+    paddingLeft: 2,
+    marginBottom: 4,
+  },
+  sageDot: {
+    width: 3,
+    height: 3,
+    borderRadius: '50%',
+    background: '#b4b4b4',
+    flexShrink: 0,
+    marginTop: 6,
+  },
+  userRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
+  },
+  userBubble: {
+    maxWidth: '78%',
+    background: C.text,
+    color: '#ffffff',
+    borderRadius: 12,
+    padding: '9px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.4,
+  },
+
+  composer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#ededed',
+    borderRadius: 12,
+    padding: '6px 6px 6px 12px',
+    flexShrink: 0,
+  },
+  composerInput: {
+    flex: 1,
+    minWidth: 0,
+    border: 'none',
+    outline: 'none',
+    background: 'transparent',
+    fontSize: 11.5,
+    fontWeight: 500,
+    color: C.text,
+    fontFamily: 'inherit',
+  },
+  sendBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    background: '#e0e0e0',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+    padding: 0,
+  },
+
+  historyScrim: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0,0,0,0.18)',
+    zIndex: 8,
+  },
+  historyPanel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 210,
+    zIndex: 9,
+    background: C.card,
+    borderRight: `1px solid ${C.border}`,
+    padding: 14,
+    overflowY: 'auto',
+  },
+  historyHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+  },
+  historyTitle: { fontSize: 12, fontWeight: 500, color: C.textMuted },
+  historyNew: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: C.text,
+    cursor: 'pointer',
+  },
+  historyItem: {
+    padding: '10px 0',
+    borderBottom: `1px solid #f0f0f0`,
+    cursor: 'pointer',
+  },
+  historyItemTitle: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: C.text,
+    lineHeight: 1.25,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  historyItemDate: {
+    marginTop: 3,
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
   },
 
   // ---- Month page ----
