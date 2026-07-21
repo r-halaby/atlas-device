@@ -694,9 +694,9 @@ const S = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
+    justifyContent: 'center',
     gap: 8,
     overflowY: 'auto',
-    paddingTop: 8,
   },
   calRow: {
     display: 'flex',
