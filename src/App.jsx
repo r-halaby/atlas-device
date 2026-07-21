@@ -3,7 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 // -------------------- Mock data --------------------
 // The calendar holds a whole month; only CAL_WINDOW days sit on screen at once
 // and scrolling slides that window one day at a time.
+const CAL_YEAR = 2026;
+const CAL_MONTH_INDEX = 6; // July
+const CAL_DAYS_IN_MONTH = 31;
 const CAL_TODAY_DAY = 17;
+// Health is only known a week out; past that a day is grey rather than green.
+const CAL_HORIZON_DAY = CAL_TODAY_DAY + 6;
 const CAL_COLOR_CYCLE = ['green', 'yellow', 'green', 'green', 'yellow', 'red', 'green'];
 const CAL_COLOR_OVERRIDES = {
   14: 'yellow',
@@ -16,12 +21,16 @@ const CAL_COLOR_OVERRIDES = {
 };
 
 function buildCalendar() {
-  return Array.from({ length: 31 }, (_, i) => {
+  return Array.from({ length: CAL_DAYS_IN_MONTH }, (_, i) => {
     const day = i + 1;
     return {
+      day,
       date: `July ${day}`,
       color:
-        CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length],
+        day > CAL_HORIZON_DAY
+          ? 'grey'
+          : (CAL_COLOR_OVERRIDES[day] ??
+            CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length]),
       today: day === CAL_TODAY_DAY,
     };
   });
@@ -168,6 +177,12 @@ const DAY_HEALTH = {
     subtitle: 'Overcommitted — something has to give',
     projects: 'Blocked',
   },
+  grey: {
+    tone: 'unknown',
+    status: 'Not yet',
+    subtitle: 'Beyond the forecast — nothing logged for this day',
+    projects: '—',
+  },
 };
 
 const HEALTH_GRADIENTS = {
@@ -177,15 +192,26 @@ const HEALTH_GRADIENTS = {
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #fff2c4 55%, #ffe07a 85%, #fdd33b 105%)',
   critical:
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #ffd6cc 55%, #ff8f74 85%, #e52a05 105%)',
+  unknown:
+    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #f0f0ec 55%, #e0e0da 85%, #cbcbc3 105%)',
 };
+
+const C_GREY = '#cbcbc3';
 
 const BAR_COLORS = {
   green: { active: C.green, faded: '#a9e5c8' },
   yellow: { active: C.yellow, faded: '#fbe7a1' },
   red: { active: C.red, faded: '#f5a58f' },
+  grey: { active: C_GREY, faded: '#e2e2dc' },
 };
 
 const CAL_DAYS = mockData.pulse.calendar;
+
+// Month grid runs Monday-first, so the 1st needs leading blanks to land under
+// its real weekday.
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const CAL_LEAD_BLANKS =
+  (new Date(CAL_YEAR, CAL_MONTH_INDEX, 1).getDay() + 6) % 7;
 const TODAY_IDX = CAL_DAYS.findIndex((d) => d.today);
 
 // Seven days on screen at a time; the middle slot is the focal one.
@@ -245,6 +271,17 @@ const IconPlus = ({ size = 12 }) => (
   </svg>
 );
 
+const IconX = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <path
+      d="M3 3 L9 9 M9 3 L3 9"
+      stroke={C.text}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 const IconGrid = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
     <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
@@ -273,8 +310,10 @@ export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
-  // See All covers the whole frame with the full to-do list.
+  // See All covers the whole frame with the full to-do list; the calendar's
+  // grid toggle covers it with the month view.
   const [todosOpen, setTodosOpen] = useState(false);
+  const [monthOpen, setMonthOpen] = useState(false);
   const [todoFilter, setTodoFilter] = useState('all'); // all | open | done
   const [facets, setFacets] = useState({
     canvas: ANY_CANVAS,
@@ -342,10 +381,12 @@ export default function App() {
     const dx = t.clientX - touchStartX.current;
     const dy = t.clientY - touchStartY.current;
     if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
-      // While the to-do page is up it owns the gesture: swipe back to leave,
-      // and don't let a swipe change the screen underneath it.
+      // While a full-frame page is up it owns the gesture: swipe back to
+      // leave, and don't let a swipe change the screen underneath it.
       if (todosOpen) {
         if (dx > 0) setTodosOpen(false);
+      } else if (monthOpen) {
+        if (dx > 0) setMonthOpen(false);
       } else if (dx < 0) setScreen(1);
       else setScreen(0);
     }
@@ -368,6 +409,10 @@ export default function App() {
         }
         return;
       }
+      if (monthOpen) {
+        if (e.key === 'Escape' || e.key === 'ArrowLeft') setMonthOpen(false);
+        return;
+      }
       if (e.key === 'ArrowLeft') setScreen(0);
       else if (e.key === 'ArrowRight') setScreen(1);
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -387,7 +432,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [screen, focusIdx, todos, todosOpen]);
+  }, [screen, focusIdx, todos, todosOpen, monthOpen, pageTodos.length]);
 
   return (
     <div style={S.root}>
@@ -410,6 +455,14 @@ export default function App() {
             toggleTodo={toggleTodo}
             onBack={() => setTodosOpen(false)}
           />
+        ) : monthOpen ? (
+          <MonthScreen
+            onClose={() => setMonthOpen(false)}
+            onPickDay={(idx) => {
+              centerCal(idx);
+              setMonthOpen(false);
+            }}
+          />
         ) : screen === 0 ? (
           <PulseScreen
             todos={todos}
@@ -420,14 +473,15 @@ export default function App() {
             stepCal={stepCal}
             centerCal={centerCal}
             onSeeAll={() => setTodosOpen(true)}
+            onOpenMonth={() => setMonthOpen(true)}
           />
         ) : (
           <CanvasScreen scrollRef={canvasScrollRef} />
         )}
 
-        {/* The dots page between Pulse and Canvases — the to-do page is not
-            one of them, so it hides while that page is up. */}
-        {!todosOpen && (
+        {/* The dots page between Pulse and Canvases. The full-frame pages are
+            not among them, so the dots hide while one is up. */}
+        {!todosOpen && !monthOpen && (
           <div style={S.dots}>
             {[0, 1].map((i) => (
               <div
@@ -457,6 +511,7 @@ function PulseScreen({
   stepCal,
   centerCal,
   onSeeAll,
+  onOpenMonth,
 }) {
   // Wheel and drag both accumulate distance and spend it a whole day at a time,
   // so the window never lands between days.
@@ -507,7 +562,14 @@ function PulseScreen({
   // The Today card reads off the centered day, so both panels stay in step.
   const centerIdx = calStart + CAL_CENTER;
   const centerDay = CAL_DAYS[centerIdx] ?? CAL_DAYS[0];
-  const month = centerDay.date.split(' ')[0];
+  // The header names the week on screen, not the month.
+  const first = CAL_DAYS[calStart];
+  const last = CAL_DAYS[Math.min(calStart + CAL_WINDOW - 1, CAL_DAYS.length - 1)];
+  const abbr = (d) => d.date.split(' ')[0].slice(0, 3);
+  const weekRange =
+    abbr(first) === abbr(last)
+      ? `${abbr(first)} ${first.day} – ${last.day}`
+      : `${abbr(first)} ${first.day} – ${abbr(last)} ${last.day}`;
   const health = DAY_HEALTH[centerDay.color];
 
   return (
@@ -547,7 +609,7 @@ function PulseScreen({
                 <IconPlus />
               </div>
             </div>
-            <ul style={S.todoList}>
+            <ul className="kiosk-scroll" style={S.todoList}>
               {todos.map((t, i) => {
                 const focused = focusIdx === i;
                 return (
@@ -611,12 +673,16 @@ function PulseScreen({
         <div style={{ ...S.card, ...S.calendarCard }}>
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
-              <IconChevron dir="left" size={11} />
-              <span style={S.monthName}>{month}</span>
-              <IconChevron dir="right" size={11} />
+              <div style={S.weekNavBtn} onClick={() => stepCal(-CAL_WINDOW)}>
+                <IconChevron dir="left" size={11} />
+              </div>
+              <span style={S.weekRange}>{weekRange}</span>
+              <div style={S.weekNavBtn} onClick={() => stepCal(CAL_WINDOW)}>
+                <IconChevron dir="right" size={11} />
+              </div>
             </div>
             <div style={S.viewToggle}>
-              <div style={S.viewToggleBtn}>
+              <div style={S.viewToggleBtn} onClick={onOpenMonth}>
                 <IconGrid size={11} />
               </div>
               <div style={{ ...S.viewToggleBtn, background: '#ffffff' }}>
@@ -681,6 +747,61 @@ function PulseScreen({
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------- Month page --------------------
+// Behind the calendar card's grid toggle. Monday-first month grid, one circle
+// per day coloured by that day's health.
+function MonthScreen({ onClose, onPickDay }) {
+  const cells = [
+    ...Array.from({ length: CAL_LEAD_BLANKS }, (_, i) => ({ blank: true, key: `b${i}` })),
+    ...CAL_DAYS.map((d, idx) => ({ d, idx, key: d.date })),
+  ];
+
+  return (
+    <div style={S.monthPage}>
+      <div style={S.monthHeader}>
+        <div style={S.monthNav}>
+          <IconChevron dir="left" size={12} />
+          <span style={S.monthNameBig}>
+            {CAL_DAYS[0].date.split(' ')[0]}
+          </span>
+          <IconChevron dir="right" size={12} />
+        </div>
+        <div style={S.closeBtn} onClick={onClose}>
+          <IconX size={11} />
+        </div>
+      </div>
+
+      <div style={S.weekHead}>
+        {WEEKDAYS.map((w) => (
+          <div key={w} style={S.weekHeadCell}>
+            {w}
+          </div>
+        ))}
+      </div>
+
+      <div style={S.monthGrid}>
+        {cells.map((c) =>
+          c.blank ? (
+            <div key={c.key} style={S.dayBlank} />
+          ) : (
+            <div
+              key={c.key}
+              style={{
+                ...S.dayCell,
+                background: BAR_COLORS[c.d.color].active,
+                boxShadow: c.d.today ? `0 0 0 2px ${C.text}` : 'none',
+              }}
+              onClick={() => onPickDay(c.idx)}
+            >
+              {c.d.day}
+            </div>
+          )
+        )}
       </div>
     </div>
   );
@@ -1101,7 +1222,9 @@ const S = {
     gap: 2,
     flex: 1,
     minHeight: 0,
-    overflow: 'hidden',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
   },
   todoItem: {
     display: 'flex',
@@ -1111,6 +1234,8 @@ const S = {
     borderRadius: 6,
     cursor: 'pointer',
     transition: 'background 120ms ease',
+    // Without this the rows compress in the column flex instead of scrolling.
+    flexShrink: 0,
   },
   checkbox: {
     width: 14,
@@ -1133,6 +1258,75 @@ const S = {
     fontSize: 11,
     color: C.textMuted,
     fontWeight: 500,
+    cursor: 'pointer',
+  },
+
+  // ---- Month page ----
+  monthPage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    background: C.bg,
+  },
+  monthHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  monthNameBig: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.5px',
+    lineHeight: 1.1,
+  },
+  closeBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  weekHead: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 8,
+    margin: '18px 0 8px',
+    flexShrink: 0,
+  },
+  weekHeadCell: {
+    textAlign: 'center',
+    fontSize: 9.5,
+    fontWeight: 600,
+    letterSpacing: '0.7px',
+    color: '#c2c2c2',
+  },
+  monthGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 8,
+    alignContent: 'start',
+  },
+  dayBlank: {
+    aspectRatio: '1 / 1',
+  },
+  dayCell: {
+    aspectRatio: '1 / 1',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 13,
+    fontWeight: 600,
+    color: C.text,
     cursor: 'pointer',
   },
 
@@ -1374,13 +1568,23 @@ const S = {
   monthNav: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
+    minWidth: 0,
   },
-  monthName: {
-    fontSize: 17,
+  weekNavBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  weekRange: {
+    fontSize: 13,
     fontWeight: 700,
     color: C.text,
-    letterSpacing: '-0.4px',
+    letterSpacing: '-0.3px',
+    whiteSpace: 'nowrap',
   },
   viewToggle: {
     display: 'flex',
