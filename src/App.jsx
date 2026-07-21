@@ -1,26 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // -------------------- Mock data --------------------
+// The calendar holds a whole month; only CAL_WINDOW days sit on screen at once
+// and scrolling slides that window one day at a time.
+const CAL_TODAY_DAY = 17;
+const CAL_COLOR_CYCLE = ['green', 'yellow', 'green', 'green', 'yellow', 'red', 'green'];
+const CAL_COLOR_OVERRIDES = {
+  14: 'yellow',
+  15: 'green',
+  16: 'green',
+  17: 'green',
+  18: 'yellow',
+  19: 'yellow',
+  20: 'red',
+};
+
+function buildCalendar() {
+  return Array.from({ length: 31 }, (_, i) => {
+    const day = i + 1;
+    return {
+      date: `July ${day}`,
+      color:
+        CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length],
+      today: day === CAL_TODAY_DAY,
+    };
+  });
+}
+
 const mockData = {
   pulse: {
-    status: 'Healthy',
-    subtitle: 'Stable operations with capacity for growth',
-    projects: 'Smooth',
     cashFlow: '87%',
     todos: [
       { id: 1, text: 'Update deck design', done: false },
       { id: 2, text: 'Schedule meeting with Brian', done: false },
       { id: 3, text: 'Review quarterly data with Rahmi', done: false },
     ],
-    calendar: [
-      { date: 'July 14', color: 'yellow' },
-      { date: 'July 15', color: 'green' },
-      { date: 'July 16', color: 'green' },
-      { date: 'July 17', color: 'green', today: true },
-      { date: 'July 18', color: 'yellow' },
-      { date: 'July 19', color: 'yellow' },
-      { date: 'July 20', color: 'red' },
-    ],
+    calendar: buildCalendar(),
   },
   canvas: {
     workspace: 'Agency',
@@ -53,6 +68,29 @@ const C = {
   red: '#e52a05',
 };
 
+// Each day's calendar color is its health signal, so the Today card and the
+// calendar bar for the centered day always tell the same story.
+const DAY_HEALTH = {
+  green: {
+    tone: 'healthy',
+    status: 'Healthy',
+    subtitle: 'Stable operations with capacity for growth',
+    projects: 'Smooth',
+  },
+  yellow: {
+    tone: 'strained',
+    status: 'Caution',
+    subtitle: 'Load is building — a few things need attention',
+    projects: 'Tight',
+  },
+  red: {
+    tone: 'critical',
+    status: 'Critical',
+    subtitle: 'Overcommitted — something has to give',
+    projects: 'Blocked',
+  },
+};
+
 const HEALTH_GRADIENTS = {
   healthy:
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #d6f7e6 55%, #7ee9b0 85%, #00db75 105%)',
@@ -68,19 +106,25 @@ const BAR_COLORS = {
   red: { active: C.red, faded: '#f5a58f' },
 };
 
-// Bar width tapers by distance from Today (index) — Today is widest, edges narrowest.
-const TODAY_IDX = mockData.pulse.calendar.findIndex((d) => d.today);
-const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
-function barPx(i) {
-  const dist = Math.abs(i - TODAY_IDX);
-  return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
-}
+const CAL_DAYS = mockData.pulse.calendar;
+const TODAY_IDX = CAL_DAYS.findIndex((d) => d.today);
 
-function statusKey(status) {
-  const s = (status || '').toLowerCase();
-  if (s.includes('strain')) return 'strained';
-  if (s.includes('critic')) return 'critical';
-  return 'healthy';
+// Seven days on screen at a time; the middle slot is the focal one.
+const CAL_WINDOW = 7;
+const CAL_CENTER = (CAL_WINDOW - 1) / 2;
+const CAL_MAX_START = Math.max(0, CAL_DAYS.length - CAL_WINDOW);
+const CAL_ROW_PITCH = 48; // row height + gap — converts drag distance into days
+
+const clampCalStart = (i) => Math.max(0, Math.min(CAL_MAX_START, i));
+
+// Height of the visible window: six 40px rows, one 48px center row, 8px gaps.
+const CAL_VIEWPORT_H = (CAL_WINDOW - 1) * CAL_ROW_PITCH + 48;
+
+// Bar width tapers by distance from the centered day — center widest, edges narrowest.
+const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
+function barPx(offsetFromCenter) {
+  const dist = Math.abs(offsetFromCenter);
+  return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
 }
 
 // -------------------- Tiny inline icons --------------------
@@ -145,11 +189,14 @@ export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
+  // Index of the first day in the visible 7-day calendar window.
+  const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-  const calendarRef = useRef(null);
   const canvasScrollRef = useRef(null);
+
+  const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
 
   const toggleTodo = (id) =>
     setTodos((prev) =>
@@ -182,7 +229,7 @@ export default function App() {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
-          calendarRef.current?.scrollBy({ top: dir * 44, behavior: 'smooth' });
+          stepCal(dir);
         } else {
           canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
@@ -197,9 +244,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [screen, focusIdx, todos]);
 
-  const health = mockData.pulse;
-  const hk = statusKey(health.status);
-
   return (
     <div style={S.root}>
       <div
@@ -209,13 +253,12 @@ export default function App() {
       >
         {screen === 0 ? (
           <PulseScreen
-            health={health}
-            hk={hk}
             todos={todos}
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
             toggleTodo={toggleTodo}
-            calendarRef={calendarRef}
+            calStart={calStart}
+            stepCal={stepCal}
           />
         ) : (
           <CanvasScreen scrollRef={canvasScrollRef} />
@@ -241,14 +284,49 @@ export default function App() {
 
 // -------------------- Pulse screen --------------------
 function PulseScreen({
-  health,
-  hk,
   todos,
   focusIdx,
   setFocusIdx,
   toggleTodo,
-  calendarRef,
+  calStart,
+  stepCal,
 }) {
+  // Wheel and drag both accumulate distance and spend it a whole day at a time,
+  // so the window never lands between days.
+  const wheelAcc = useRef(0);
+  const dragFrom = useRef(null);
+
+  const onWheel = (e) => {
+    wheelAcc.current += e.deltaY;
+    const days = Math.trunc(wheelAcc.current / CAL_ROW_PITCH);
+    if (days) {
+      wheelAcc.current -= days * CAL_ROW_PITCH;
+      stepCal(days);
+    }
+  };
+
+  const onCalTouchStart = (e) => {
+    dragFrom.current = e.touches[0].clientY;
+  };
+  const onCalTouchMove = (e) => {
+    if (dragFrom.current == null) return;
+    const dy = dragFrom.current - e.touches[0].clientY; // drag up → later days
+    const days = Math.trunc(dy / CAL_ROW_PITCH);
+    if (days) {
+      dragFrom.current -= days * CAL_ROW_PITCH;
+      stepCal(days);
+    }
+  };
+  const onCalTouchEnd = () => {
+    dragFrom.current = null;
+  };
+
+  // The Today card reads off the centered day, so both panels stay in step.
+  const centerIdx = calStart + CAL_CENTER;
+  const centerDay = CAL_DAYS[centerIdx] ?? CAL_DAYS[0];
+  const month = centerDay.date.split(' ')[0];
+  const health = DAY_HEALTH[centerDay.color];
+
   return (
     <div style={S.pulse}>
       <div style={S.pageLabel}>Pulse</div>
@@ -260,11 +338,13 @@ function PulseScreen({
             style={{
               ...S.card,
               ...S.todayCard,
-              background: HEALTH_GRADIENTS[hk],
+              background: HEALTH_GRADIENTS[health.tone],
             }}
           >
             <div>
-              <div style={S.cardTitle}>Today</div>
+              <div style={S.cardTitle}>
+                {centerDay.today ? 'Today' : centerDay.date}
+              </div>
               <div style={S.todaySubtitle}>{health.subtitle}</div>
             </div>
             <div style={S.todayFooter}>
@@ -347,7 +427,7 @@ function PulseScreen({
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
               <IconChevron dir="left" size={11} />
-              <span style={S.monthName}>June</span>
+              <span style={S.monthName}>{month}</span>
               <IconChevron dir="right" size={11} />
             </div>
             <div style={S.viewToggle}>
@@ -360,33 +440,56 @@ function PulseScreen({
             </div>
           </div>
 
-          <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
-            {mockData.pulse.calendar.map((d, i) => {
-              const bar = BAR_COLORS[d.color];
-              const isPast = !d.today && isBefore(d.date, 'July 17');
-              const fill = isPast ? bar.faded : bar.active;
-              return (
-                <div key={d.date} style={S.calRow}>
-                  <div
-                    style={{
-                      ...S.calDate,
-                      color: d.today ? C.text : '#c9c9c9',
-                      fontWeight: d.today ? 700 : 500,
-                    }}
-                  >
-                    {d.today ? 'Today' : d.date}
-                  </div>
-                  <div
-                    style={{
-                      ...S.calBar,
-                      width: barPx(i),
-                      height: d.today ? 48 : 40,
-                      background: fill,
-                    }}
-                  />
-                </div>
-              );
-            })}
+          <div
+            style={S.calendarBody}
+            onWheel={onWheel}
+            onTouchStart={onCalTouchStart}
+            onTouchMove={onCalTouchMove}
+            onTouchEnd={onCalTouchEnd}
+          >
+            <div style={S.calViewport}>
+              {/* Every day is rendered once, in fixed DOM order — only the
+                  strip's offset and each bar's size change, so the browser
+                  has a stable "before" style to transition from. */}
+              <div
+                style={{
+                  ...S.calStrip,
+                  transform: `translateY(${-calStart * CAL_ROW_PITCH}px)`,
+                }}
+              >
+                {CAL_DAYS.map((d, idx) => {
+                  const bar = BAR_COLORS[d.color];
+                  // The centered day carries the emphasis, Today included.
+                  const isCenter = idx === centerIdx;
+                  // Only past days away from the center fade — the centered day
+                  // always reads at full saturation, as does anything upcoming.
+                  const isPast = TODAY_IDX >= 0 && idx < TODAY_IDX && !isCenter;
+                  const fill = isPast ? bar.faded : bar.active;
+                  return (
+                    <div key={d.date} style={S.calRow}>
+                      <div
+                        style={{
+                          ...S.calDate,
+                          color: isCenter ? C.text : '#c9c9c9',
+                          fontWeight: isCenter ? 700 : 500,
+                        }}
+                      >
+                        {d.today ? 'Today' : d.date}
+                      </div>
+                      <div
+                        style={{
+                          ...S.calBar,
+                          width: barPx(idx - centerIdx),
+                          height: isCenter ? 48 : 40,
+                          background: fill,
+                          boxShadow: `0 0 0 2px ${isCenter ? C.text : 'transparent'}`,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -455,14 +558,6 @@ function ProjectThumb({ seed }) {
       />
     </svg>
   );
-}
-
-// -------------------- Helpers --------------------
-function isBefore(a, b) {
-  // Compare "July 14" strings by day number
-  const dayA = parseInt(a.split(' ')[1], 10);
-  const dayB = parseInt(b.split(' ')[1], 10);
-  return dayA < dayB;
 }
 
 // -------------------- Styles --------------------
@@ -692,14 +787,27 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
+    overflow: 'hidden',
+    touchAction: 'none', // the window is stepped by hand, not natively scrolled
+  },
+  calViewport: {
+    height: CAL_VIEWPORT_H,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  calStrip: {
+    display: 'flex',
+    flexDirection: 'column',
     gap: 8,
-    overflowY: 'auto',
+    transition: 'transform 200ms ease',
+    willChange: 'transform',
   },
   calRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    flexShrink: 0,
   },
   calDate: {
     fontSize: 12,
@@ -709,7 +817,12 @@ const S = {
   },
   calBar: {
     borderRadius: 8,
-    transition: 'width 200ms ease, height 200ms ease, background 200ms ease',
+    // The ring is a spread shadow, so it sits 2px outside the block instead of
+    // eating into it, and costs no layout. Every bar carries one at full spread
+    // and only its color animates, so it fades in as the block grows.
+    boxShadow: '0 0 0 2px transparent',
+    transition:
+      'width 200ms ease, height 200ms ease, background 200ms ease, box-shadow 200ms ease',
     flexShrink: 0,
   },
 
