@@ -125,6 +125,24 @@ const mockData = {
     ],
     calendar: buildCalendar(),
   },
+  sage: {
+    tagline: 'Intelligence layer for design operations',
+    intro: {
+      lead: 'Sage is active. I maintain shared understanding across your goals, decisions, and revisions so your team stays aligned as work evolves.',
+      listLead: 'I can help you:',
+      bullets: [
+        'Surface and classify feedback across the project',
+        'Flag when work has drifted from stated intent',
+        'Log and retrieve key decisions as they’re made',
+        'Execute canvas actions through natural language',
+      ],
+    },
+    history: [
+      { id: 1, title: 'One of the stakeholders on the Puma inv…', date: '6/12/2026' },
+      { id: 2, title: 'Summarise the Creator Day feedback', date: '6/9/2026' },
+      { id: 3, title: 'What changed on Vega Launch Deck?', date: '5/28/2026' },
+    ],
+  },
   canvas: {
     workspace: 'Agency',
     projects: [
@@ -282,6 +300,79 @@ const IconX = ({ size = 12 }) => (
   </svg>
 );
 
+const IconMenu = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <path
+      d="M2 4 H12 M2 7 H9 M2 10 H6"
+      stroke={C.text}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconMic = ({ size = 20, color = '#ffffff' }) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <rect x="7" y="2.5" width="6" height="9.5" rx="3" fill={color} />
+    <path
+      d="M4.5 9.5 a5.5 5.5 0 0 0 11 0"
+      stroke={color}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      fill="none"
+    />
+    <path
+      d="M10 15 V17.5"
+      stroke={color}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// Sage's logomark, inlined from Sage_LogoMark_Yellow.svg, inset on a black disc
+// so the yellow holds against the light kiosk background.
+const SAGE_YELLOW = '#EEFC00';
+const SageMark = ({ size = 34 }) => (
+  <svg width={size} height={size} viewBox="0 0 648 648" fill="none">
+    <circle cx="324" cy="324" r="324" fill="#0a0a0a" />
+    <g transform="translate(324 324) scale(0.66) translate(-323.61 -323.61)">
+      <path
+        d="M82.29 265.27H31.65C14.1702 265.27 0 279.44 0 296.92V347.56C0 365.04 14.1702 379.21 31.65 379.21H82.29C99.7698 379.21 113.94 365.04 113.94 347.56V296.92C113.94 279.44 99.7698 265.27 82.29 265.27Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 533.28H296.92C279.44 533.28 265.27 547.45 265.27 564.93V615.57C265.27 633.05 279.44 647.22 296.92 647.22H347.56C365.04 647.22 379.21 633.05 379.21 615.57V564.93C379.21 547.45 365.04 533.28 347.56 533.28Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 355.52H296.92C279.44 355.52 265.27 369.69 265.27 387.17V437.81C265.27 455.29 279.44 469.46 296.92 469.46H347.56C365.04 469.46 379.21 455.29 379.21 437.81V387.17C379.21 369.69 365.04 355.52 347.56 355.52Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 177.76H296.92C279.44 177.76 265.27 191.93 265.27 209.41V260.05C265.27 277.53 279.44 291.7 296.92 291.7H347.56C365.04 291.7 379.21 277.53 379.21 260.05V209.41C379.21 191.93 365.04 177.76 347.56 177.76Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M615.57 268.01H564.93C547.45 268.01 533.28 282.18 533.28 299.66V350.3C533.28 367.78 547.45 381.95 564.93 381.95H615.57C633.05 381.95 647.22 367.78 647.22 350.3V299.66C647.22 282.18 633.05 268.01 615.57 268.01Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M538.44 79.0698H487.8C470.32 79.0698 456.15 93.24 456.15 110.72V161.36C456.15 178.84 470.32 193.01 487.8 193.01H538.44C555.92 193.01 570.09 178.84 570.09 161.36V110.72C570.09 93.24 555.92 79.0698 538.44 79.0698Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M350.3 0H299.66C282.18 0 268.01 14.1702 268.01 31.65V82.29C268.01 99.7698 282.18 113.94 299.66 113.94H350.3C367.78 113.94 381.95 99.7698 381.95 82.29V31.65C381.95 14.1702 367.78 0 350.3 0Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M161.36 77.1299H110.72C93.24 77.1299 79.0698 91.3001 79.0698 108.78V159.42C79.0698 176.9 93.24 191.07 110.72 191.07H161.36C178.84 191.07 193.01 176.9 193.01 159.42V108.78C193.01 91.3001 178.84 77.1299 161.36 77.1299Z"
+        fill={SAGE_YELLOW}
+      />
+    </g>
+  </svg>
+);
+
 const IconGrid = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
     <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
@@ -307,7 +398,8 @@ const IconList = ({ size = 12 }) => (
 
 // -------------------- Component --------------------
 export default function App() {
-  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
+  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas, 2=sage
+  const [messages, setMessages] = useState(SAGE_OPENING);
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
   // See All covers the whole frame with the full to-do list; the calendar's
@@ -326,6 +418,24 @@ export default function App() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   const canvasScrollRef = useRef(null);
+  const chatScrollRef = useRef(null);
+
+  // Replies are canned — there's no model behind the kiosk, this is the shape
+  // of the exchange rather than a real one.
+  const sendMessage = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    setMessages((m) => [
+      ...m,
+      { id: m.length, from: 'user', text: t },
+      {
+        id: m.length + 1,
+        from: 'sage',
+        text: SAGE_REPLIES[m.filter((x) => x.from === 'user').length % SAGE_REPLIES.length],
+      },
+    ]);
+  };
+  const newChat = () => setMessages(SAGE_OPENING);
 
   const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
   const centerCal = (idx) => setCalStart(clampCalStart(idx - CAL_CENTER));
@@ -387,8 +497,8 @@ export default function App() {
         if (dx > 0) setTodosOpen(false);
       } else if (monthOpen) {
         if (dx > 0) setMonthOpen(false);
-      } else if (dx < 0) setScreen(1);
-      else setScreen(0);
+      } else if (dx < 0) setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
+      else setScreen((s) => Math.max(0, s - 1));
     }
     touchStartX.current = null;
     touchStartY.current = null;
@@ -396,6 +506,10 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      // Don't steal keys from the chat input — arrows would swipe pages and
+      // Enter would toggle a to-do instead of sending.
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (todosOpen) {
         if (e.key === 'Escape' || e.key === 'ArrowLeft') setTodosOpen(false);
         else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -413,15 +527,17 @@ export default function App() {
         if (e.key === 'Escape' || e.key === 'ArrowLeft') setMonthOpen(false);
         return;
       }
-      if (e.key === 'ArrowLeft') setScreen(0);
-      else if (e.key === 'ArrowRight') setScreen(1);
+      if (e.key === 'ArrowLeft') setScreen((s) => Math.max(0, s - 1));
+      else if (e.key === 'ArrowRight')
+        setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           stepCal(dir);
         } else {
-          canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
+          const ref = screen === 1 ? canvasScrollRef : chatScrollRef;
+          ref.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
@@ -475,15 +591,22 @@ export default function App() {
             onSeeAll={() => setTodosOpen(true)}
             onOpenMonth={() => setMonthOpen(true)}
           />
-        ) : (
+        ) : screen === 1 ? (
           <CanvasScreen scrollRef={canvasScrollRef} />
+        ) : (
+          <SageScreen
+            messages={messages}
+            onSend={sendMessage}
+            onNewChat={newChat}
+            scrollRef={chatScrollRef}
+          />
         )}
 
         {/* The dots page between Pulse and Canvases. The full-frame pages are
             not among them, so the dots hide while one is up. */}
         {!todosOpen && !monthOpen && (
           <div style={S.dots}>
-            {[0, 1].map((i) => (
+            {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 onClick={() => setScreen(i)}
@@ -752,6 +875,196 @@ function PulseScreen({
   );
 }
 
+// -------------------- Sage screen --------------------
+// Third swipe page. The reference is a two-pane desktop layout; at 480x480 the
+// history sidebar becomes a slide-over behind the hamburger.
+function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [phase, setPhase] = useState('idle'); // idle | listening | thinking
+  const [heard, setHeard] = useState('');
+  const recRef = useRef(null);
+  const timerRef = useRef(null);
+  const simIdx = useRef(0);
+  const sage = mockData.sage;
+
+  // Keep the newest message in view as the thread grows.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, scrollRef]);
+
+  // Sage answers out loud — voice in, voice out.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.from !== 'sage' || last.intro) return;
+    const synth = typeof window !== 'undefined' && window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    synth.speak(new SpeechSynthesisUtterance(last.text));
+  }, [messages]);
+
+  // Leaving the page must not leave the mic or a timer running.
+  useEffect(
+    () => () => {
+      clearTimeout(timerRef.current);
+      recRef.current?.abort?.();
+      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+    },
+    []
+  );
+
+  const settle = (text) => {
+    setPhase('thinking');
+    timerRef.current = setTimeout(() => {
+      onSend(text);
+      setHeard('');
+      setPhase('idle');
+    }, 600);
+  };
+
+  const stopListening = () => {
+    recRef.current?.abort?.();
+    clearTimeout(timerRef.current);
+    setHeard('');
+    setPhase('idle');
+  };
+
+  const toggleMic = () => {
+    if (phase === 'listening') return stopListening();
+    if (phase === 'thinking') return;
+
+    setHeard('');
+    setPhase('listening');
+
+    if (SpeechRec) {
+      const rec = new SpeechRec();
+      rec.lang = 'en-US';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (e) => {
+        const text = Array.from(e.results)
+          .map((r) => r[0].transcript)
+          .join('')
+          .trim();
+        setHeard(text);
+        if (e.results[e.results.length - 1].isFinal && text) settle(text);
+      };
+      rec.onerror = () => setPhase('idle');
+      rec.onend = () => setPhase((p) => (p === 'listening' ? 'idle' : p));
+      recRef.current = rec;
+      rec.start();
+      return;
+    }
+
+    const text = SAGE_SPOKEN_PROMPTS[simIdx.current++ % SAGE_SPOKEN_PROMPTS.length];
+    setHeard(text);
+    timerRef.current = setTimeout(() => settle(text), 1400);
+  };
+
+  const status =
+    heard || (phase === 'thinking' ? 'Thinking…' : phase === 'listening' ? 'Listening…' : 'Tap to speak');
+
+  return (
+    <div style={S.sagePage}>
+      <div style={S.sageHeader}>
+        <div style={S.sageIconBtn} onClick={() => setHistoryOpen(true)}>
+          <IconMenu size={14} />
+        </div>
+        <SageMark size={34} />
+        <div style={S.sageTitleBlock}>
+          <div style={S.sageName}>Sage</div>
+          <div style={S.sageTagline}>{sage.tagline}</div>
+        </div>
+        <div style={S.sageIconBtn} onClick={onNewChat}>
+          <IconPlus size={13} />
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="kiosk-scroll" style={S.sageThread}>
+        {messages.map((m) =>
+          m.from === 'user' ? (
+            <div key={m.id} style={S.userRow}>
+              <div style={S.userBubble}>{m.text}</div>
+            </div>
+          ) : (
+            <div key={m.id} style={S.sageRow}>
+              <SageMark size={22} />
+              <div style={S.sageBubble}>
+                {m.intro ? (
+                  <>
+                    <div style={S.sageLead}>{sage.intro.lead}</div>
+                    <div style={S.sageListLead}>{sage.intro.listLead}</div>
+                    {sage.intro.bullets.map((b) => (
+                      <div key={b} style={S.sageBullet}>
+                        <span style={S.sageDot} />
+                        <span>{b}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  m.text
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+
+      <div style={S.voiceBar}>
+        <div
+          style={{
+            ...S.voiceStatus,
+            color: heard ? C.text : C.textMuted,
+            fontStyle: heard ? 'normal' : 'italic',
+          }}
+        >
+          {status}
+        </div>
+        <div
+          className={phase === 'listening' ? 'sage-listening' : undefined}
+          style={{
+            ...S.micBtn,
+            background: phase === 'listening' ? C.red : C.text,
+          }}
+          onClick={toggleMic}
+        >
+          <IconMic size={20} />
+        </div>
+      </div>
+
+      {historyOpen && (
+        <>
+          <div style={S.historyScrim} onClick={() => setHistoryOpen(false)} />
+          <div style={S.historyPanel}>
+            <div style={S.historyHead}>
+              <span style={S.historyTitle}>Chat History</span>
+              <span
+                style={S.historyNew}
+                onClick={() => {
+                  onNewChat();
+                  setHistoryOpen(false);
+                }}
+              >
+                + New
+              </span>
+            </div>
+            {sage.history.map((h) => (
+              <div
+                key={h.id}
+                style={S.historyItem}
+                onClick={() => setHistoryOpen(false)}
+              >
+                <div style={S.historyItemTitle}>{h.title}</div>
+                <div style={S.historyItemDate}>{h.date}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // -------------------- Month page --------------------
 // Behind the calendar card's grid toggle. Monday-first month grid, one circle
 // per day coloured by that day's health.
@@ -810,6 +1123,27 @@ function MonthScreen({ onClose, onPickDay }) {
 // -------------------- To-Dos page --------------------
 // The full list, behind the Pulse card's See All. Covers the whole frame, so
 // it carries its own way back rather than relying on the dots.
+const SCREEN_COUNT = 3; // pulse, canvases, sage
+
+const SAGE_OPENING = [{ id: 0, from: 'sage', intro: true }];
+
+// Sage is voice-only. Where the browser has no SpeechRecognition — which is
+// most Chromium builds on a Pi — these stand in so the flow still runs.
+const SAGE_SPOKEN_PROMPTS = [
+  'What changed on the Puma deck this week?',
+  'Summarise the Creator Day feedback',
+  'Log that we chose the second concept',
+];
+const SpeechRec =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null;
+const SAGE_REPLIES = [
+  'Logged. I’ll track that against the project’s stated intent and flag drift as it appears.',
+  'Noted — I’ve tied that to the current canvas so the decision stays retrievable.',
+  'Classified as scope feedback. It’ll surface in the next digest for the team.',
+];
+
 const TODO_FILTERS = ['All', 'Open', 'Done'];
 
 const ANY_CANVAS = 'All Canvases';
@@ -1259,6 +1593,196 @@ const S = {
     color: C.textMuted,
     fontWeight: 500,
     cursor: 'pointer',
+  },
+
+  // ---- Sage screen ----
+  sagePage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    paddingBottom: 24,
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  sageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+    flexShrink: 0,
+  },
+  sageIconBtn: {
+    width: 22,
+    height: 22,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  sageTitleBlock: { flex: 1, minWidth: 0 },
+  sageName: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.3px',
+    lineHeight: 1.15,
+  },
+  sageTagline: {
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
+    lineHeight: 1.2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+
+  sageThread: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
+    padding: '12px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  sageRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    flexShrink: 0,
+  },
+  sageBubble: {
+    flex: 1,
+    minWidth: 0,
+    background: '#ededed',
+    borderRadius: 12,
+    padding: '10px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.45,
+    color: C.textMedium,
+  },
+  sageLead: { marginBottom: 8 },
+  sageListLead: { marginBottom: 5 },
+  sageBullet: {
+    display: 'flex',
+    gap: 7,
+    paddingLeft: 2,
+    marginBottom: 4,
+  },
+  sageDot: {
+    width: 3,
+    height: 3,
+    borderRadius: '50%',
+    background: '#b4b4b4',
+    flexShrink: 0,
+    marginTop: 6,
+  },
+  userRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
+  },
+  userBubble: {
+    maxWidth: '78%',
+    background: C.text,
+    color: '#ffffff',
+    borderRadius: 12,
+    padding: '9px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.4,
+  },
+
+  voiceBar: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 10,
+    flexShrink: 0,
+  },
+  voiceStatus: {
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.3,
+    textAlign: 'center',
+    maxWidth: '92%',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  },
+  micBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+    transition: 'background 160ms ease',
+  },
+
+  historyScrim: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0,0,0,0.18)',
+    zIndex: 8,
+  },
+  historyPanel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 210,
+    zIndex: 9,
+    background: C.card,
+    borderRight: `1px solid ${C.border}`,
+    padding: 14,
+    overflowY: 'auto',
+  },
+  historyHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+  },
+  historyTitle: { fontSize: 12, fontWeight: 500, color: C.textMuted },
+  historyNew: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: C.text,
+    cursor: 'pointer',
+  },
+  historyItem: {
+    padding: '10px 0',
+    borderBottom: `1px solid #f0f0f0`,
+    cursor: 'pointer',
+  },
+  historyItemTitle: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: C.text,
+    lineHeight: 1.25,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  historyItemDate: {
+    marginTop: 3,
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
   },
 
   // ---- Month page ----
