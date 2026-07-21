@@ -311,30 +311,65 @@ const IconMenu = ({ size = 14 }) => (
   </svg>
 );
 
-const IconSend = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+const IconMic = ({ size = 20, color = '#ffffff' }) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <rect x="7" y="2.5" width="6" height="9.5" rx="3" fill={color} />
     <path
-      d="M12.2 1.8 L1.6 5.9 L6.1 7.9 L8.1 12.4 Z"
-      stroke={C.textMedium}
-      strokeWidth="1.3"
-      strokeLinejoin="round"
+      d="M4.5 9.5 a5.5 5.5 0 0 0 11 0"
+      stroke={color}
+      strokeWidth="1.6"
+      strokeLinecap="round"
       fill="none"
+    />
+    <path
+      d="M10 15 V17.5"
+      stroke={color}
+      strokeWidth="1.6"
+      strokeLinecap="round"
     />
   </svg>
 );
 
-// Sage's mark: a dotted cluster on a black disc.
+// Sage's logomark, inlined from Sage_LogoMark_Yellow.svg, inset on a black disc
+// so the yellow holds against the light kiosk background.
+const SAGE_YELLOW = '#EEFC00';
 const SageMark = ({ size = 34 }) => (
-  <svg width={size} height={size} viewBox="0 0 34 34">
-    <circle cx="17" cy="17" r="17" fill="#0a0a0a" />
-    {[
-      [12, 11], [17, 11], [22, 11],
-      [12, 15.5], [17, 15.5], [22, 15.5],
-      [12, 20], [17, 20], [22, 20],
-      [14.5, 24], [19.5, 24],
-    ].map(([x, y], i) => (
-      <circle key={i} cx={x} cy={y} r="1.5" fill="#3d3d3d" />
-    ))}
+  <svg width={size} height={size} viewBox="0 0 648 648" fill="none">
+    <circle cx="324" cy="324" r="324" fill="#0a0a0a" />
+    <g transform="translate(324 324) scale(0.66) translate(-323.61 -323.61)">
+      <path
+        d="M82.29 265.27H31.65C14.1702 265.27 0 279.44 0 296.92V347.56C0 365.04 14.1702 379.21 31.65 379.21H82.29C99.7698 379.21 113.94 365.04 113.94 347.56V296.92C113.94 279.44 99.7698 265.27 82.29 265.27Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 533.28H296.92C279.44 533.28 265.27 547.45 265.27 564.93V615.57C265.27 633.05 279.44 647.22 296.92 647.22H347.56C365.04 647.22 379.21 633.05 379.21 615.57V564.93C379.21 547.45 365.04 533.28 347.56 533.28Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 355.52H296.92C279.44 355.52 265.27 369.69 265.27 387.17V437.81C265.27 455.29 279.44 469.46 296.92 469.46H347.56C365.04 469.46 379.21 455.29 379.21 437.81V387.17C379.21 369.69 365.04 355.52 347.56 355.52Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M347.56 177.76H296.92C279.44 177.76 265.27 191.93 265.27 209.41V260.05C265.27 277.53 279.44 291.7 296.92 291.7H347.56C365.04 291.7 379.21 277.53 379.21 260.05V209.41C379.21 191.93 365.04 177.76 347.56 177.76Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M615.57 268.01H564.93C547.45 268.01 533.28 282.18 533.28 299.66V350.3C533.28 367.78 547.45 381.95 564.93 381.95H615.57C633.05 381.95 647.22 367.78 647.22 350.3V299.66C647.22 282.18 633.05 268.01 615.57 268.01Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M538.44 79.0698H487.8C470.32 79.0698 456.15 93.24 456.15 110.72V161.36C456.15 178.84 470.32 193.01 487.8 193.01H538.44C555.92 193.01 570.09 178.84 570.09 161.36V110.72C570.09 93.24 555.92 79.0698 538.44 79.0698Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M350.3 0H299.66C282.18 0 268.01 14.1702 268.01 31.65V82.29C268.01 99.7698 282.18 113.94 299.66 113.94H350.3C367.78 113.94 381.95 99.7698 381.95 82.29V31.65C381.95 14.1702 367.78 0 350.3 0Z"
+        fill={SAGE_YELLOW}
+      />
+      <path
+        d="M161.36 77.1299H110.72C93.24 77.1299 79.0698 91.3001 79.0698 108.78V159.42C79.0698 176.9 93.24 191.07 110.72 191.07H161.36C178.84 191.07 193.01 176.9 193.01 159.42V108.78C193.01 91.3001 178.84 77.1299 161.36 77.1299Z"
+        fill={SAGE_YELLOW}
+      />
+    </g>
   </svg>
 );
 
@@ -844,8 +879,12 @@ function PulseScreen({
 // Third swipe page. The reference is a two-pane desktop layout; at 480x480 the
 // history sidebar becomes a slide-over behind the hamburger.
 function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
-  const [draft, setDraft] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [phase, setPhase] = useState('idle'); // idle | listening | thinking
+  const [heard, setHeard] = useState('');
+  const recRef = useRef(null);
+  const timerRef = useRef(null);
+  const simIdx = useRef(0);
   const sage = mockData.sage;
 
   // Keep the newest message in view as the thread grows.
@@ -854,11 +893,76 @@ function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, scrollRef]);
 
-  const submit = (e) => {
-    e.preventDefault();
-    onSend(draft);
-    setDraft('');
+  // Sage answers out loud — voice in, voice out.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.from !== 'sage' || last.intro) return;
+    const synth = typeof window !== 'undefined' && window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    synth.speak(new SpeechSynthesisUtterance(last.text));
+  }, [messages]);
+
+  // Leaving the page must not leave the mic or a timer running.
+  useEffect(
+    () => () => {
+      clearTimeout(timerRef.current);
+      recRef.current?.abort?.();
+      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+    },
+    []
+  );
+
+  const settle = (text) => {
+    setPhase('thinking');
+    timerRef.current = setTimeout(() => {
+      onSend(text);
+      setHeard('');
+      setPhase('idle');
+    }, 600);
   };
+
+  const stopListening = () => {
+    recRef.current?.abort?.();
+    clearTimeout(timerRef.current);
+    setHeard('');
+    setPhase('idle');
+  };
+
+  const toggleMic = () => {
+    if (phase === 'listening') return stopListening();
+    if (phase === 'thinking') return;
+
+    setHeard('');
+    setPhase('listening');
+
+    if (SpeechRec) {
+      const rec = new SpeechRec();
+      rec.lang = 'en-US';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (e) => {
+        const text = Array.from(e.results)
+          .map((r) => r[0].transcript)
+          .join('')
+          .trim();
+        setHeard(text);
+        if (e.results[e.results.length - 1].isFinal && text) settle(text);
+      };
+      rec.onerror = () => setPhase('idle');
+      rec.onend = () => setPhase((p) => (p === 'listening' ? 'idle' : p));
+      recRef.current = rec;
+      rec.start();
+      return;
+    }
+
+    const text = SAGE_SPOKEN_PROMPTS[simIdx.current++ % SAGE_SPOKEN_PROMPTS.length];
+    setHeard(text);
+    timerRef.current = setTimeout(() => settle(text), 1400);
+  };
+
+  const status =
+    heard || (phase === 'thinking' ? 'Thinking…' : phase === 'listening' ? 'Listening…' : 'Tap to speak');
 
   return (
     <div style={S.sagePage}>
@@ -906,17 +1010,27 @@ function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
         )}
       </div>
 
-      <form style={S.composer} onSubmit={submit}>
-        <input
-          style={S.composerInput}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask Sage anything..."
-        />
-        <button type="submit" style={S.sendBtn}>
-          <IconSend size={14} />
-        </button>
-      </form>
+      <div style={S.voiceBar}>
+        <div
+          style={{
+            ...S.voiceStatus,
+            color: heard ? C.text : C.textMuted,
+            fontStyle: heard ? 'normal' : 'italic',
+          }}
+        >
+          {status}
+        </div>
+        <div
+          className={phase === 'listening' ? 'sage-listening' : undefined}
+          style={{
+            ...S.micBtn,
+            background: phase === 'listening' ? C.red : C.text,
+          }}
+          onClick={toggleMic}
+        >
+          <IconMic size={20} />
+        </div>
+      </div>
 
       {historyOpen && (
         <>
@@ -1012,6 +1126,18 @@ function MonthScreen({ onClose, onPickDay }) {
 const SCREEN_COUNT = 3; // pulse, canvases, sage
 
 const SAGE_OPENING = [{ id: 0, from: 'sage', intro: true }];
+
+// Sage is voice-only. Where the browser has no SpeechRecognition — which is
+// most Chromium builds on a Pi — these stand in so the flow still runs.
+const SAGE_SPOKEN_PROMPTS = [
+  'What changed on the Puma deck this week?',
+  'Summarise the Creator Day feedback',
+  'Log that we chose the second concept',
+];
+const SpeechRec =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : null;
 const SAGE_REPLIES = [
   'Logged. I’ll track that against the project’s stated intent and flag drift as it appears.',
   'Noted — I’ve tied that to the current canvas so the decision stays retrievable.',
@@ -1575,38 +1701,35 @@ const S = {
     lineHeight: 1.4,
   },
 
-  composer: {
+  voiceBar: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
-    background: '#ededed',
-    borderRadius: 12,
-    padding: '6px 6px 6px 12px',
+    paddingTop: 10,
     flexShrink: 0,
   },
-  composerInput: {
-    flex: 1,
-    minWidth: 0,
-    border: 'none',
-    outline: 'none',
-    background: 'transparent',
-    fontSize: 11.5,
+  voiceStatus: {
+    fontSize: 11,
     fontWeight: 500,
-    color: C.text,
-    fontFamily: 'inherit',
+    lineHeight: 1.3,
+    textAlign: 'center',
+    maxWidth: '92%',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
   },
-  sendBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    background: '#e0e0e0',
-    border: 'none',
+  micBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
     flexShrink: 0,
-    padding: 0,
+    transition: 'background 160ms ease',
   },
 
   historyScrim: {
