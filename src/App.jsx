@@ -694,16 +694,15 @@ const S = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-around',
+    gap: 8,
     overflowY: 'auto',
-    paddingTop: 4,
+    paddingTop: 8,
   },
   calRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    minHeight: 30,
   },
   calDate: {
     fontSize: 12,
