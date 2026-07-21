@@ -30,10 +30,61 @@ function buildCalendar() {
 const mockData = {
   pulse: {
     cashFlow: '87%',
+    // More than the Pulse card can show — the card lists what fits and
+    // See All opens the rest.
     todos: [
-      { id: 1, text: 'Update deck design', done: false },
-      { id: 2, text: 'Schedule meeting with Brian', done: false },
-      { id: 3, text: 'Review quarterly data with Rahmi', done: false },
+      {
+        id: 1,
+        text: 'Update deck design',
+        done: false,
+        meta: ['No Collection', 'puma_f1_files', 'Puma Invite Concepts-02'],
+      },
+      {
+        id: 2,
+        text: 'Schedule meeting with Brian',
+        done: false,
+        overdue: '39d overdue',
+        meta: ['No Collection', 'puma_f1_files', 'Puma Invite Concepts-02'],
+      },
+      {
+        id: 3,
+        text: 'Review quarterly data with Rahmi',
+        done: false,
+        assignee: 'AC',
+        meta: ['No Collection', 'Creator Day Design', 'Creator Day Concepts-01'],
+      },
+      {
+        id: 4,
+        text: 'Send Northwind the revised invoice',
+        done: false,
+        meta: ['Finance', 'northwind_files', 'Northwind Retainer-01'],
+      },
+      {
+        id: 5,
+        text: 'Draft Q3 retainer proposal',
+        done: false,
+        assignee: 'RH',
+        meta: ['Q3 Planning', 'northwind_files', 'Northwind Retainer-02'],
+      },
+      {
+        id: 6,
+        text: 'Pull analytics for the Vega launch',
+        done: true,
+        meta: ['No Collection', 'vega_launch', 'Vega Launch Deck-02'],
+      },
+      {
+        id: 7,
+        text: 'Reply to Priya about the workshop',
+        done: false,
+        overdue: '4d overdue',
+        meta: ['No Collection', 'creator_day', 'Creator Day Concepts-03'],
+      },
+      {
+        id: 8,
+        text: 'Archive last quarter’s canvases',
+        done: true,
+        meta: ['Housekeeping', 'archive_2026', 'Q2 Canvases'],
+      },
     ],
     calendar: buildCalendar(),
   },
@@ -135,7 +186,12 @@ const IconChevron = ({ dir = 'right', size = 12 }) => (
     viewBox="0 0 12 12"
     fill="none"
     style={{
-      transform: dir === 'left' ? 'rotate(180deg)' : 'none',
+      transform:
+        dir === 'left'
+          ? 'rotate(180deg)'
+          : dir === 'down'
+            ? 'rotate(90deg)'
+            : 'none',
       display: 'block',
     }}
   >
@@ -189,6 +245,9 @@ export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
   const [todos, setTodos] = useState(mockData.pulse.todos);
   const [focusIdx, setFocusIdx] = useState(0);
+  // See All covers the whole frame with the full to-do list.
+  const [todosOpen, setTodosOpen] = useState(false);
+  const [todoFilter, setTodoFilter] = useState('all'); // all | open | done
   // Index of the first day in the visible 7-day calendar window.
   const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
 
@@ -204,6 +263,16 @@ export default function App() {
       prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
 
+  // What the to-do page is showing. Keyboard focus walks this same list, so it
+  // can never land on a row the filter is hiding.
+  const pageTodos = todos.filter((t) =>
+    todoFilter === 'open' ? !t.done : todoFilter === 'done' ? t.done : true
+  );
+  const changeFilter = (f) => {
+    setTodoFilter(f);
+    setFocusIdx(0);
+  };
+
   const onTouchStart = (e) => {
     const t = e.touches[0];
     touchStartX.current = t.clientX;
@@ -215,7 +284,11 @@ export default function App() {
     const dx = t.clientX - touchStartX.current;
     const dy = t.clientY - touchStartY.current;
     if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) setScreen(1);
+      // While the to-do page is up it owns the gesture: swipe back to leave,
+      // and don't let a swipe change the screen underneath it.
+      if (todosOpen) {
+        if (dx > 0) setTodosOpen(false);
+      } else if (dx < 0) setScreen(1);
       else setScreen(0);
     }
     touchStartX.current = null;
@@ -224,6 +297,19 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (todosOpen) {
+        if (e.key === 'Escape' || e.key === 'ArrowLeft') setTodosOpen(false);
+        else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          const dir = e.key === 'ArrowUp' ? -1 : 1;
+          setFocusIdx((i) =>
+            Math.max(0, Math.min(pageTodos.length - 1, i + dir))
+          );
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (pageTodos[focusIdx]) toggleTodo(pageTodos[focusIdx].id);
+        }
+        return;
+      }
       if (e.key === 'ArrowLeft') setScreen(0);
       else if (e.key === 'ArrowRight') setScreen(1);
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -243,7 +329,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [screen, focusIdx, todos]);
+  }, [screen, focusIdx, todos, todosOpen]);
 
   return (
     <div style={S.root}>
@@ -252,7 +338,18 @@ export default function App() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {screen === 0 ? (
+        {todosOpen ? (
+          <TodosScreen
+            todos={pageTodos}
+            total={todos.length}
+            filter={todoFilter}
+            setFilter={changeFilter}
+            focusIdx={focusIdx}
+            setFocusIdx={setFocusIdx}
+            toggleTodo={toggleTodo}
+            onBack={() => setTodosOpen(false)}
+          />
+        ) : screen === 0 ? (
           <PulseScreen
             todos={todos}
             focusIdx={focusIdx}
@@ -261,24 +358,29 @@ export default function App() {
             calStart={calStart}
             stepCal={stepCal}
             centerCal={centerCal}
+            onSeeAll={() => setTodosOpen(true)}
           />
         ) : (
           <CanvasScreen scrollRef={canvasScrollRef} />
         )}
 
-        <div style={S.dots}>
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              onClick={() => setScreen(i)}
-              style={{
-                ...S.dot,
-                width: screen === i ? 22 : 6,
-                background: screen === i ? C.text : '#cccccc',
-              }}
-            />
-          ))}
-        </div>
+        {/* The dots page between Pulse and Canvases — the to-do page is not
+            one of them, so it hides while that page is up. */}
+        {!todosOpen && (
+          <div style={S.dots}>
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                onClick={() => setScreen(i)}
+                style={{
+                  ...S.dot,
+                  width: screen === i ? 22 : 6,
+                  background: screen === i ? C.text : '#cccccc',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -293,6 +395,7 @@ function PulseScreen({
   calStart,
   stepCal,
   centerCal,
+  onSeeAll,
 }) {
   // Wheel and drag both accumulate distance and spend it a whole day at a time,
   // so the window never lands between days.
@@ -437,7 +540,9 @@ function PulseScreen({
                 );
               })}
             </ul>
-            <div style={S.seeAll}>See All</div>
+            <div style={S.seeAll} onClick={onSeeAll}>
+              See All
+            </div>
           </div>
         </div>
 
@@ -516,6 +621,140 @@ function PulseScreen({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// -------------------- To-Dos page --------------------
+// The full list, behind the Pulse card's See All. Covers the whole frame, so
+// it carries its own way back rather than relying on the dots.
+const TODO_FILTERS = ['All', 'Open', 'Done'];
+// Presentational only — there is no canvas/user/date model behind the kiosk yet.
+const TODO_DROPDOWNS = ['All Canvases', 'All Users', 'Any Date'];
+
+function TodosScreen({
+  todos,
+  total,
+  filter,
+  setFilter,
+  focusIdx,
+  setFocusIdx,
+  toggleTodo,
+  onBack,
+}) {
+  return (
+    <div style={S.todosPage}>
+      {/* Header and filters stay put; only the list below them scrolls. */}
+      <div style={S.todosPageHeader}>
+        <div style={S.backBtn} onClick={onBack}>
+          <IconChevron dir="left" size={12} />
+        </div>
+        <div style={S.todosPageTitle}>All To-Dos</div>
+        <div style={S.newTodoBtn}>
+          <IconPlus size={10} />
+          <span>New To-Do</span>
+        </div>
+      </div>
+
+      <div style={S.segmented}>
+        {TODO_FILTERS.map((f) => {
+          const key = f.toLowerCase();
+          const on = key === filter;
+          return (
+            <div
+              key={f}
+              onClick={() => setFilter(key)}
+              style={{
+                ...S.segItem,
+                background: on ? C.card : 'transparent',
+                color: on ? C.text : C.textMuted,
+                fontWeight: on ? 600 : 500,
+                boxShadow: on ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+              }}
+            >
+              {f}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={S.dropdownRow}>
+        {TODO_DROPDOWNS.map((d) => (
+          <div key={d} style={S.dropdown}>
+            <span style={S.dropdownLabel}>{d}</span>
+            <IconChevron dir="down" size={9} />
+          </div>
+        ))}
+      </div>
+
+      <ul className="kiosk-scroll" style={S.todosPageList}>
+        {todos.map((t, i) => {
+          const focused = focusIdx === i;
+          return (
+            <li
+              key={t.id}
+              style={{
+                ...S.todoRow,
+                background: focused ? 'rgba(0,0,0,0.03)' : 'transparent',
+              }}
+              onClick={() => {
+                setFocusIdx(i);
+                toggleTodo(t.id);
+              }}
+            >
+              <span
+                style={{
+                  ...S.checkbox,
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  marginTop: 1,
+                  borderColor: t.done ? C.text : '#d4d4d4',
+                  background: t.done ? C.text : 'transparent',
+                }}
+              >
+                {t.done && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path
+                      d="M2 5.2 L4.2 7.2 L8 3"
+                      stroke="#ffffff"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </span>
+
+              <div style={S.todoRowBody}>
+                <div style={S.todoRowTitleLine}>
+                  <span
+                    style={{
+                      ...S.todoRowTitle,
+                      color: t.done ? C.textMuted : C.text,
+                      textDecoration: t.done ? 'line-through' : 'none',
+                    }}
+                  >
+                    {t.text}
+                  </span>
+                  {t.overdue && !t.done && (
+                    <span style={S.overduePill}>{t.overdue}</span>
+                  )}
+                </div>
+                <div style={S.todoRowMeta}>{t.meta.join('  ·  ')}</div>
+              </div>
+
+              {t.assignee && <span style={S.avatar}>{t.assignee}</span>}
+            </li>
+          );
+        })}
+
+        {todos.length === 0 && (
+          <li style={S.todosEmpty}>
+            Nothing {filter === 'done' ? 'done' : 'open'} — {total} in all
+          </li>
+        )}
+      </ul>
     </div>
   );
 }
@@ -760,6 +999,192 @@ const S = {
     fontSize: 11,
     color: C.textMuted,
     fontWeight: 500,
+    cursor: 'pointer',
+  },
+
+  // ---- To-Dos page ----
+  todosPage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    paddingBottom: 0, // the list runs to the bottom edge
+    display: 'flex',
+    flexDirection: 'column',
+    background: C.card,
+    minHeight: 0,
+  },
+  todosPageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  backBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  todosPageTitle: {
+    flex: 1,
+    fontSize: 19,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.4px',
+    lineHeight: 1.1,
+  },
+  newTodoBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    height: 26,
+    padding: '0 10px',
+    borderRadius: 8,
+    background: '#f2f2f2',
+    border: `1px solid ${C.border}`,
+    fontSize: 11,
+    fontWeight: 500,
+    color: C.text,
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+
+  segmented: {
+    display: 'flex',
+    alignSelf: 'flex-start',
+    background: '#f0f0f0',
+    borderRadius: 8,
+    padding: 2,
+    gap: 2,
+    marginTop: 10,
+    flexShrink: 0,
+  },
+  segItem: {
+    minWidth: 46,
+    height: 22,
+    padding: '0 10px',
+    borderRadius: 6,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 11,
+    cursor: 'pointer',
+    transition: 'background 120ms ease, color 120ms ease',
+  },
+  dropdownRow: {
+    display: 'flex',
+    gap: 6,
+    marginTop: 6,
+    flexShrink: 0,
+  },
+  dropdown: {
+    flex: 1,
+    minWidth: 0,
+    height: 24,
+    padding: '0 8px',
+    borderRadius: 8,
+    background: '#f0f0f0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    fontSize: 10,
+    fontWeight: 500,
+    color: C.textMuted,
+  },
+  dropdownLabel: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+
+  // The list is the only scrolling region. Negative margins let the row
+  // dividers run full-bleed to the frame edges, as in the reference.
+  todosPageList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: '10px -14px 0 -14px',
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
+  },
+  todoRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: '9px 14px',
+    borderTop: '1px solid #ededed',
+    cursor: 'pointer',
+    transition: 'background 120ms ease',
+  },
+  todoRowBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  todoRowTitleLine: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  todoRowTitle: {
+    fontSize: 12.5,
+    fontWeight: 500,
+    lineHeight: 1.25,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  overduePill: {
+    fontSize: 9,
+    fontWeight: 500,
+    color: C.red,
+    background: '#fdecea',
+    padding: '2px 5px',
+    borderRadius: 4,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  todoRowMeta: {
+    marginTop: 3,
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
+    lineHeight: 1.2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  avatar: {
+    width: 20,
+    height: 20,
+    borderRadius: '50%',
+    background: '#e8e8e8',
+    color: C.textMedium,
+    fontSize: 8.5,
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  todosEmpty: {
+    padding: '20px 14px',
+    fontSize: 11,
+    fontWeight: 500,
+    color: C.textMuted,
+    borderTop: '1px solid #ededed',
   },
 
   // ---- Calendar card ----
