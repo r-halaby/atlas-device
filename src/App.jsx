@@ -71,6 +71,12 @@ const BAR_COLORS = {
 // Bar width tapers by distance from Today (index) — Today is widest, edges narrowest.
 const TODAY_IDX = mockData.pulse.calendar.findIndex((d) => d.today);
 const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
+
+// Header month follows the day marked Today, falling back to the first day shown.
+const CAL_MONTH = (
+  mockData.pulse.calendar[TODAY_IDX] ?? mockData.pulse.calendar[0]
+)?.date.split(' ')[0];
+
 function barPx(i) {
   const dist = Math.abs(i - TODAY_IDX);
   return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
@@ -347,7 +353,7 @@ function PulseScreen({
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
               <IconChevron dir="left" size={11} />
-              <span style={S.monthName}>June</span>
+              <span style={S.monthName}>{CAL_MONTH}</span>
               <IconChevron dir="right" size={11} />
             </div>
             <div style={S.viewToggle}>
@@ -363,7 +369,7 @@ function PulseScreen({
           <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
             {mockData.pulse.calendar.map((d, i) => {
               const bar = BAR_COLORS[d.color];
-              const isPast = !d.today && isBefore(d.date, 'July 17');
+              const isPast = TODAY_IDX >= 0 && i < TODAY_IDX;
               const fill = isPast ? bar.faded : bar.active;
               return (
                 <div key={d.date} style={S.calRow}>
@@ -455,14 +461,6 @@ function ProjectThumb({ seed }) {
       />
     </svg>
   );
-}
-
-// -------------------- Helpers --------------------
-function isBefore(a, b) {
-  // Compare "July 14" strings by day number
-  const dayA = parseInt(a.split(' ')[1], 10);
-  const dayB = parseInt(b.split(' ')[1], 10);
-  return dayA < dayB;
 }
 
 // -------------------- Styles --------------------
