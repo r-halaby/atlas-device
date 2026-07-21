@@ -31,6 +31,9 @@ const mockData = {
       { id: 4, name: 'Project Name' },
       { id: 5, name: 'Project Name' },
       { id: 6, name: 'Project Name' },
+      { id: 7, name: 'Project Name' },
+      { id: 8, name: 'Project Name' },
+      { id: 9, name: 'Project Name' },
     ],
   },
 };
@@ -173,22 +176,15 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'ArrowLeft') {
-        if (screen === 1) setScreen(0);
-        else canvasScrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' });
-      } else if (e.key === 'ArrowRight') {
-        if (screen === 0) setScreen(1);
-        else canvasScrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' });
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (e.key === 'ArrowLeft') setScreen(0);
+      else if (e.key === 'ArrowRight') setScreen(1);
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           calendarRef.current?.scrollBy({ top: dir * 44, behavior: 'smooth' });
         } else {
-          canvasScrollRef.current?.scrollBy({
-            left: dir * 200,
-            behavior: 'smooth',
-          });
+          canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
@@ -402,17 +398,19 @@ function PulseScreen({
 function CanvasScreen({ scrollRef }) {
   return (
     <div style={S.canvas}>
-      <div style={S.pageLabel}>All</div>
+      <div style={S.pageLabel}>Canvases</div>
       <div ref={scrollRef} className="kiosk-scroll" style={S.canvasScroll}>
-        {mockData.canvas.projects.map((p, i) => (
-          <div key={p.id} style={S.projectCard}>
-            <div style={S.thumb}>
-              <ProjectThumb seed={i} />
+        <div style={S.grid}>
+          {mockData.canvas.projects.map((p, i) => (
+            <div key={p.id} style={S.projectCard}>
+              <div style={S.thumb}>
+                <ProjectThumb seed={i} />
+              </div>
+              <div style={S.projectName}>{p.name}</div>
+              <div style={S.projectMeta}>Active • Edited 3h ago</div>
             </div>
-            <div style={S.projectName}>{p.name}</div>
-            <div style={S.projectMeta}>Active • Edited 3h ago</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -720,46 +718,51 @@ const S = {
     width: '100%',
     height: '100%',
     padding: 14,
-    paddingBottom: 30,
+    paddingBottom: 24,
     display: 'flex',
     flexDirection: 'column',
   },
   canvasScroll: {
     flex: 1,
-    display: 'flex',
-    gap: 12,
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    paddingBottom: 4,
-    scrollSnapType: 'x mandatory',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingRight: 2,
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    columnGap: 10,
+    rowGap: 14,
   },
   projectCard: {
-    flex: '0 0 auto',
-    width: 200,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    scrollSnapAlign: 'start',
+    gap: 6,
+    minWidth: 0,
   },
   thumb: {
     width: '100%',
-    height: 200,
-    borderRadius: 10,
-    background: C.card,
-    border: `1px solid ${C.border}`,
+    aspectRatio: '5 / 3',
+    borderRadius: 8,
+    background: '#efefef',
     overflow: 'hidden',
   },
   projectName: {
-    fontSize: 14,
-    fontWeight: 600,
+    fontSize: 11,
+    fontWeight: 700,
     color: C.text,
     letterSpacing: '-0.2px',
+    lineHeight: 1.1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   projectMeta: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 500,
     color: C.textMuted,
-    marginTop: -4,
+    marginTop: -2,
+    lineHeight: 1.1,
   },
 
   // ---- Dots ----
