@@ -29,9 +29,6 @@ function buildCalendar() {
 
 const mockData = {
   pulse: {
-    status: 'Healthy',
-    subtitle: 'Stable operations with capacity for growth',
-    projects: 'Smooth',
     cashFlow: '87%',
     todos: [
       { id: 1, text: 'Update deck design', done: false },
@@ -71,6 +68,29 @@ const C = {
   red: '#e52a05',
 };
 
+// Each day's calendar color is its health signal, so the Today card and the
+// calendar bar for the centered day always tell the same story.
+const DAY_HEALTH = {
+  green: {
+    tone: 'healthy',
+    status: 'Healthy',
+    subtitle: 'Stable operations with capacity for growth',
+    projects: 'Smooth',
+  },
+  yellow: {
+    tone: 'strained',
+    status: 'Caution',
+    subtitle: 'Load is building — a few things need attention',
+    projects: 'Tight',
+  },
+  red: {
+    tone: 'critical',
+    status: 'Critical',
+    subtitle: 'Overcommitted — something has to give',
+    projects: 'Blocked',
+  },
+};
+
 const HEALTH_GRADIENTS = {
   healthy:
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #d6f7e6 55%, #7ee9b0 85%, #00db75 105%)',
@@ -97,18 +117,14 @@ const CAL_ROW_PITCH = 48; // row height + gap — converts drag distance into da
 
 const clampCalStart = (i) => Math.max(0, Math.min(CAL_MAX_START, i));
 
-// Bar width tapers by distance from the centered slot — center widest, edges narrowest.
-const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
-function barPx(slot) {
-  const dist = Math.abs(slot - CAL_CENTER);
-  return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
-}
+// Height of the visible window: six 40px rows, one 48px center row, 8px gaps.
+const CAL_VIEWPORT_H = (CAL_WINDOW - 1) * CAL_ROW_PITCH + 48;
 
-function statusKey(status) {
-  const s = (status || '').toLowerCase();
-  if (s.includes('strain')) return 'strained';
-  if (s.includes('critic')) return 'critical';
-  return 'healthy';
+// Bar width tapers by distance from the centered day — center widest, edges narrowest.
+const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
+function barPx(offsetFromCenter) {
+  const dist = Math.abs(offsetFromCenter);
+  return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
 }
 
 // -------------------- Tiny inline icons --------------------
@@ -228,9 +244,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [screen, focusIdx, todos]);
 
-  const health = mockData.pulse;
-  const hk = statusKey(health.status);
-
   return (
     <div style={S.root}>
       <div
@@ -240,8 +253,6 @@ export default function App() {
       >
         {screen === 0 ? (
           <PulseScreen
-            health={health}
-            hk={hk}
             todos={todos}
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
@@ -273,8 +284,6 @@ export default function App() {
 
 // -------------------- Pulse screen --------------------
 function PulseScreen({
-  health,
-  hk,
   todos,
   focusIdx,
   setFocusIdx,
@@ -312,8 +321,11 @@ function PulseScreen({
     dragFrom.current = null;
   };
 
-  const visible = CAL_DAYS.slice(calStart, calStart + CAL_WINDOW);
-  const month = (visible[CAL_CENTER] ?? CAL_DAYS[0])?.date.split(' ')[0];
+  // The Today card reads off the centered day, so both panels stay in step.
+  const centerIdx = calStart + CAL_CENTER;
+  const centerDay = CAL_DAYS[centerIdx] ?? CAL_DAYS[0];
+  const month = centerDay.date.split(' ')[0];
+  const health = DAY_HEALTH[centerDay.color];
 
   return (
     <div style={S.pulse}>
@@ -326,11 +338,13 @@ function PulseScreen({
             style={{
               ...S.card,
               ...S.todayCard,
-              background: HEALTH_GRADIENTS[hk],
+              background: HEALTH_GRADIENTS[health.tone],
             }}
           >
             <div>
-              <div style={S.cardTitle}>Today</div>
+              <div style={S.cardTitle}>
+                {centerDay.today ? 'Today' : centerDay.date}
+              </div>
               <div style={S.todaySubtitle}>{health.subtitle}</div>
             </div>
             <div style={S.todayFooter}>
@@ -433,34 +447,49 @@ function PulseScreen({
             onTouchMove={onCalTouchMove}
             onTouchEnd={onCalTouchEnd}
           >
-            {visible.map((d, slot) => {
-              const bar = BAR_COLORS[d.color];
-              const isPast = TODAY_IDX >= 0 && calStart + slot < TODAY_IDX;
-              const fill = isPast ? bar.faded : bar.active;
-              // The centered day carries the emphasis, Today included.
-              const isCenter = slot === CAL_CENTER;
-              return (
-                <div key={d.date} style={S.calRow}>
-                  <div
-                    style={{
-                      ...S.calDate,
-                      color: isCenter ? C.text : '#c9c9c9',
-                      fontWeight: isCenter ? 700 : 500,
-                    }}
-                  >
-                    {d.today ? 'Today' : d.date}
-                  </div>
-                  <div
-                    style={{
-                      ...S.calBar,
-                      width: barPx(slot),
-                      height: isCenter ? 48 : 40,
-                      background: fill,
-                    }}
-                  />
-                </div>
-              );
-            })}
+            <div style={S.calViewport}>
+              {/* Every day is rendered once, in fixed DOM order — only the
+                  strip's offset and each bar's size change, so the browser
+                  has a stable "before" style to transition from. */}
+              <div
+                style={{
+                  ...S.calStrip,
+                  transform: `translateY(${-calStart * CAL_ROW_PITCH}px)`,
+                }}
+              >
+                {CAL_DAYS.map((d, idx) => {
+                  const bar = BAR_COLORS[d.color];
+                  // The centered day carries the emphasis, Today included.
+                  const isCenter = idx === centerIdx;
+                  // Only past days away from the center fade — the centered day
+                  // always reads at full saturation, as does anything upcoming.
+                  const isPast = TODAY_IDX >= 0 && idx < TODAY_IDX && !isCenter;
+                  const fill = isPast ? bar.faded : bar.active;
+                  return (
+                    <div key={d.date} style={S.calRow}>
+                      <div
+                        style={{
+                          ...S.calDate,
+                          color: isCenter ? C.text : '#c9c9c9',
+                          fontWeight: isCenter ? 700 : 500,
+                        }}
+                      >
+                        {d.today ? 'Today' : d.date}
+                      </div>
+                      <div
+                        style={{
+                          ...S.calBar,
+                          width: barPx(idx - centerIdx),
+                          height: isCenter ? 48 : 40,
+                          background: fill,
+                          boxShadow: `0 0 0 2px ${isCenter ? C.text : 'transparent'}`,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -758,9 +787,20 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    gap: 8,
     overflow: 'hidden',
     touchAction: 'none', // the window is stepped by hand, not natively scrolled
+  },
+  calViewport: {
+    height: CAL_VIEWPORT_H,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  calStrip: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    transition: 'transform 200ms ease',
+    willChange: 'transform',
   },
   calRow: {
     display: 'flex',
@@ -777,7 +817,12 @@ const S = {
   },
   calBar: {
     borderRadius: 8,
-    transition: 'width 200ms ease, height 200ms ease, background 200ms ease',
+    // The ring is a spread shadow, so it sits 2px outside the block instead of
+    // eating into it, and costs no layout. Every bar carries one at full spread
+    // and only its color animates, so it fades in as the block grows.
+    boxShadow: '0 0 0 2px transparent',
+    transition:
+      'width 200ms ease, height 200ms ease, background 200ms ease, box-shadow 200ms ease',
     flexShrink: 0,
   },
 
