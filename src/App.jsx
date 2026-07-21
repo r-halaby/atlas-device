@@ -61,13 +61,19 @@ const HEALTH_GRADIENTS = {
 };
 
 const BAR_COLORS = {
-  green: { active: C.green, faded: 'rgba(0,219,117,0.4)' },
-  yellow: { active: C.yellow, faded: 'rgba(253,211,59,0.4)' },
-  red: { active: C.red, faded: 'rgba(229,42,5,0.4)' },
+  green: { active: C.green, faded: '#a9e5c8' },
+  yellow: { active: C.yellow, faded: '#fbe7a1' },
+  red: { active: C.red, faded: '#f5a58f' },
 };
 
-// Bar width encodes relative workload
-const BAR_WIDTHS = { green: 55, yellow: 75, red: 100 };
+// Bar width encodes relative workload (in px, sized for the ~210px calendar card)
+function barPx(d, i) {
+  const base = { green: 85, yellow: 85, red: 70 }[d.color];
+  const todayBonus = d.today ? 28 : 0;
+  // Slight taper on trailing reds so the last row looks lightest
+  const redTaper = d.color === 'red' && i === mockData.pulse.calendar.length - 1 ? -18 : 0;
+  return base + todayBonus + redTaper;
+}
 
 function statusKey(status) {
   const s = (status || '').toLowerCase();
@@ -121,10 +127,13 @@ const IconGrid = ({ size = 12 }) => (
 
 const IconList = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <circle cx="2" cy="3" r="0.9" fill={C.text} />
+    <circle cx="2" cy="6" r="0.9" fill={C.text} />
+    <circle cx="2" cy="9" r="0.9" fill={C.text} />
     <path
-      d="M2 3 H10 M2 6 H10 M2 9 H10"
-      stroke={C.textMuted}
-      strokeWidth="1.4"
+      d="M4.5 3 H10 M4.5 6 H10 M4.5 9 H10"
+      stroke={C.text}
+      strokeWidth="1.2"
       strokeLinecap="round"
     />
   </svg>
@@ -343,36 +352,32 @@ function PulseScreen({
         <div style={{ ...S.card, ...S.calendarCard }}>
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
-              <IconChevron dir="left" />
+              <IconChevron dir="left" size={11} />
               <span style={S.monthName}>June</span>
-              <IconChevron dir="right" />
+              <IconChevron dir="right" size={11} />
             </div>
             <div style={S.viewToggle}>
-              <div style={{ ...S.viewToggleBtn, background: '#ffffff' }}>
-                <IconGrid />
-              </div>
               <div style={S.viewToggleBtn}>
-                <IconList />
+                <IconGrid size={11} />
+              </div>
+              <div style={{ ...S.viewToggleBtn, background: '#ffffff' }}>
+                <IconList size={11} />
               </div>
             </div>
           </div>
 
           <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
-            {mockData.pulse.calendar.map((d) => {
+            {mockData.pulse.calendar.map((d, i) => {
               const bar = BAR_COLORS[d.color];
               const isPast = !d.today && isBefore(d.date, 'July 17');
-              const color = isPast ? bar.faded : bar.active;
+              const fill = isPast ? bar.faded : bar.active;
               return (
                 <div key={d.date} style={S.calRow}>
                   <div
                     style={{
                       ...S.calDate,
-                      color: d.today
-                        ? C.text
-                        : isPast
-                          ? 'rgba(164,164,164,0.55)'
-                          : C.textMuted,
-                      fontWeight: d.today ? 600 : 500,
+                      color: d.today ? C.text : '#c9c9c9',
+                      fontWeight: d.today ? 700 : 500,
                     }}
                   >
                     {d.today ? 'Today' : d.date}
@@ -380,8 +385,8 @@ function PulseScreen({
                   <div
                     style={{
                       ...S.calBar,
-                      width: BAR_WIDTHS[d.color] + '%',
-                      background: color,
+                      width: barPx(d, i),
+                      background: fill,
                     }}
                   />
                 </div>
@@ -508,7 +513,7 @@ const S = {
     minHeight: 0,
   },
   leftCol: {
-    flex: '1 1 58%',
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
@@ -644,7 +649,9 @@ const S = {
 
   // ---- Calendar card ----
   calendarCard: {
-    flex: '1 1 42%',
+    flex: '0 0 210px',
+    background: '#efefef',
+    border: 'none',
     padding: 12,
     display: 'flex',
     flexDirection: 'column',
@@ -654,30 +661,31 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   monthNav: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   monthName: {
-    fontSize: 14,
-    fontWeight: 600,
+    fontSize: 17,
+    fontWeight: 700,
     color: C.text,
-    letterSpacing: '-0.3px',
+    letterSpacing: '-0.4px',
   },
   viewToggle: {
     display: 'flex',
-    background: '#f5f5f5',
-    borderRadius: 6,
+    background: 'transparent',
+    borderRadius: 8,
     padding: 2,
     gap: 2,
+    border: `1px solid ${C.border}`,
   },
   viewToggleBtn: {
     width: 22,
     height: 20,
-    borderRadius: 4,
+    borderRadius: 6,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -688,27 +696,26 @@ const S = {
     flexDirection: 'column',
     justifyContent: 'space-around',
     overflowY: 'auto',
-    gap: 3,
-    paddingRight: 2,
+    paddingTop: 4,
   },
   calRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    minHeight: 26,
+    justifyContent: 'center',
+    gap: 12,
+    minHeight: 30,
   },
   calDate: {
-    fontSize: 11,
-    fontWeight: 500,
-    textAlign: 'right',
-    flex: '0 0 50px',
+    fontSize: 12,
     lineHeight: 1,
+    whiteSpace: 'nowrap',
+    letterSpacing: '-0.1px',
   },
   calBar: {
-    height: 20,
-    borderRadius: 3,
-    transition: 'width 200ms ease',
-    minWidth: 30,
+    height: 22,
+    borderRadius: 999,
+    transition: 'width 200ms ease, background 200ms ease',
+    flexShrink: 0,
   },
 
   // ---- Canvas screen ----
