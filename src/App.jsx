@@ -36,31 +36,38 @@ const mockData = {
   },
 };
 
-// -------------------- Design tokens --------------------
-const HEALTH_STYLES = {
-  healthy: {
-    color: '#bbf7d0',
-    gradient:
-      'linear-gradient(135deg, #14532d 0%, #166534 45%, rgba(20,83,45,0.15) 100%)',
-    ring: 'rgba(134,239,172,0.25)',
-  },
-  strained: {
-    color: '#fde68a',
-    gradient:
-      'linear-gradient(135deg, #713f12 0%, #854d0e 45%, rgba(113,63,18,0.15) 100%)',
-    ring: 'rgba(253,230,138,0.25)',
-  },
-  critical: {
-    color: '#fca5a5',
-    gradient:
-      'linear-gradient(135deg, #7f1d1d 0%, #991b1b 45%, rgba(127,29,29,0.15) 100%)',
-    ring: 'rgba(252,165,165,0.25)',
-  },
+// -------------------- Design tokens (from Figma) --------------------
+const C = {
+  bg: '#f5f5f5',
+  card: '#ffffff',
+  border: '#e5e5e5',
+  divider: 'rgba(198,198,198,0.4)',
+  text: '#0a0a0a',
+  textMuted: '#a4a4a4',
+  textMedium: '#4f4f4f',
+  green: '#00db75',
+  greenDeep: '#00b963',
+  yellow: '#fdd33b',
+  red: '#e52a05',
 };
 
-const BAR_COLORS = { green: '#22c55e', yellow: '#eab308', red: '#ef4444' };
+const HEALTH_GRADIENTS = {
+  healthy:
+    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #d6f7e6 55%, #7ee9b0 85%, #00db75 105%)',
+  strained:
+    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #fff2c4 55%, #ffe07a 85%, #fdd33b 105%)',
+  critical:
+    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #ffd6cc 55%, #ff8f74 85%, #e52a05 105%)',
+};
+
+const BAR_COLORS = {
+  green: { active: C.green, faded: 'rgba(0,219,117,0.4)' },
+  yellow: { active: C.yellow, faded: 'rgba(253,211,59,0.4)' },
+  red: { active: C.red, faded: 'rgba(229,42,5,0.4)' },
+};
+
 // Bar width encodes relative workload
-const BAR_WIDTHS = { green: 35, yellow: 65, red: 100 };
+const BAR_WIDTHS = { green: 55, yellow: 75, red: 100 };
 
 function statusKey(status) {
   const s = (status || '').toLowerCase();
@@ -68,6 +75,60 @@ function statusKey(status) {
   if (s.includes('critic')) return 'critical';
   return 'healthy';
 }
+
+// -------------------- Tiny inline icons --------------------
+const IconChevron = ({ dir = 'right', size = 12 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 12 12"
+    fill="none"
+    style={{
+      transform: dir === 'left' ? 'rotate(180deg)' : 'none',
+      display: 'block',
+    }}
+  >
+    <path
+      d="M4 2 L8 6 L4 10"
+      stroke={C.text}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+const IconPlus = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <path
+      d="M6 2 V10 M2 6 H10"
+      stroke={C.text}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconGrid = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
+    <rect x="7" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
+    <rect x="1.5" y="7" width="3.5" height="3.5" rx="0.6" fill={C.text} />
+    <rect x="7" y="7" width="3.5" height="3.5" rx="0.6" fill={C.text} />
+  </svg>
+);
+
+const IconList = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <path
+      d="M2 3 H10 M2 6 H10 M2 9 H10"
+      stroke={C.textMuted}
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+);
 
 // -------------------- Component --------------------
 export default function App() {
@@ -78,14 +139,13 @@ export default function App() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   const calendarRef = useRef(null);
-  const canvasRef = useRef(null);
+  const canvasScrollRef = useRef(null);
 
   const toggleTodo = (id) =>
     setTodos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
 
-  // Touch swipe (horizontal) switches screens
   const onTouchStart = (e) => {
     const t = e.touches[0];
     touchStartX.current = t.clientX;
@@ -104,21 +164,24 @@ export default function App() {
     touchStartY.current = null;
   };
 
-  // Rotary encoder — simulated via keyboard.
-  // ArrowLeft/Right: switch screen. ArrowUp/Down: scroll/focus. Enter/Space: click.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'ArrowLeft') {
-        setScreen(0);
+        if (screen === 1) setScreen(0);
+        else canvasScrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' });
       } else if (e.key === 'ArrowRight') {
-        setScreen(1);
+        if (screen === 0) setScreen(1);
+        else canvasScrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' });
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
-          calendarRef.current?.scrollBy({ top: dir * 42, behavior: 'smooth' });
+          calendarRef.current?.scrollBy({ top: dir * 44, behavior: 'smooth' });
         } else {
-          canvasRef.current?.scrollBy({ top: dir * 90, behavior: 'smooth' });
+          canvasScrollRef.current?.scrollBy({
+            left: dir * 200,
+            behavior: 'smooth',
+          });
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
@@ -133,7 +196,6 @@ export default function App() {
 
   const health = mockData.pulse;
   const hk = statusKey(health.status);
-  const hs = HEALTH_STYLES[hk];
 
   return (
     <div style={S.root}>
@@ -143,138 +205,19 @@ export default function App() {
         onTouchEnd={onTouchEnd}
       >
         {screen === 0 ? (
-          <div style={S.pulse}>
-            <div style={S.pulseCols}>
-              {/* Left column: health + todos */}
-              <div style={S.leftCol}>
-                <div
-                  style={{
-                    ...S.healthCard,
-                    background: hs.gradient,
-                    boxShadow: `inset 0 0 0 1px ${hs.ring}`,
-                  }}
-                >
-                  <div style={{ ...S.statusWord, color: hs.color }}>
-                    {health.status}
-                  </div>
-                  <div style={S.subtitle}>{health.subtitle}</div>
-                  <div style={S.statsRow}>
-                    <div style={S.stat}>
-                      <span style={S.statLabel}>Projects:</span>
-                      <span style={S.statValue}>{health.projects}</span>
-                    </div>
-                    <div style={S.statDivider} />
-                    <div style={S.stat}>
-                      <span style={S.statLabel}>Cash Flow:</span>
-                      <span style={S.statValue}>{health.cashFlow}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={S.todosBlock}>
-                  <div style={S.sectionLabel}>To-Dos</div>
-                  <ul style={S.todoList}>
-                    {todos.map((t, i) => {
-                      const focused = focusIdx === i;
-                      return (
-                        <li
-                          key={t.id}
-                          style={{
-                            ...S.todoItem,
-                            background: focused
-                              ? 'rgba(255,255,255,0.04)'
-                              : 'transparent',
-                            outline: focused
-                              ? '1px solid rgba(255,255,255,0.12)'
-                              : '1px solid transparent',
-                          }}
-                          onClick={() => {
-                            setFocusIdx(i);
-                            toggleTodo(t.id);
-                          }}
-                        >
-                          <span
-                            style={{
-                              ...S.checkbox,
-                              borderColor: t.done ? '#4ade80' : '#525252',
-                              background: t.done ? '#4ade80' : 'transparent',
-                            }}
-                          >
-                            {t.done && <span style={S.check}>✓</span>}
-                          </span>
-                          <span
-                            style={{
-                              ...S.todoText,
-                              color: t.done ? '#737373' : '#f5f5f5',
-                              textDecoration: t.done ? 'line-through' : 'none',
-                            }}
-                          >
-                            {t.text}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <div style={S.seeAll}>See All →</div>
-                </div>
-              </div>
-
-              {/* Right column: calendar strip */}
-              <div
-                ref={calendarRef}
-                className="kiosk-scroll"
-                style={S.calendarCol}
-              >
-                {mockData.pulse.calendar.map((d) => {
-                  const [, dayNum] = d.date.split(' ');
-                  return (
-                    <div key={d.date} style={S.calRow}>
-                      <div style={S.calDateBlock}>
-                        <div
-                          style={{
-                            ...S.calDay,
-                            color: d.today ? '#fff' : '#a3a3a3',
-                            fontWeight: d.today ? 700 : 500,
-                          }}
-                        >
-                          {dayNum}
-                        </div>
-                        {d.today && <div style={S.todayLabel}>TODAY</div>}
-                      </div>
-                      <div style={S.calBarTrack}>
-                        <div
-                          style={{
-                            ...S.calBar,
-                            width: BAR_WIDTHS[d.color] + '%',
-                            background: BAR_COLORS[d.color],
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <PulseScreen
+            health={health}
+            hk={hk}
+            todos={todos}
+            focusIdx={focusIdx}
+            setFocusIdx={setFocusIdx}
+            toggleTodo={toggleTodo}
+            calendarRef={calendarRef}
+          />
         ) : (
-          <div
-            ref={canvasRef}
-            className="kiosk-scroll"
-            style={S.canvas}
-          >
-            <div style={S.workspaceLabel}>{mockData.canvas.workspace}</div>
-            <div style={S.grid}>
-              {mockData.canvas.projects.map((p) => (
-                <div key={p.id} style={S.projectCard}>
-                  <div style={S.thumb} />
-                  <div style={S.projectName}>{p.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <CanvasScreen scrollRef={canvasScrollRef} />
         )}
 
-        {/* Bottom dot indicator */}
         <div style={S.dots}>
           {[0, 1].map((i) => (
             <div
@@ -283,7 +226,7 @@ export default function App() {
               style={{
                 ...S.dot,
                 width: screen === i ? 22 : 6,
-                background: screen === i ? '#f5f5f5' : '#404040',
+                background: screen === i ? C.text : '#cccccc',
               }}
             />
           ))}
@@ -291,6 +234,233 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+// -------------------- Pulse screen --------------------
+function PulseScreen({
+  health,
+  hk,
+  todos,
+  focusIdx,
+  setFocusIdx,
+  toggleTodo,
+  calendarRef,
+}) {
+  return (
+    <div style={S.pulse}>
+      <div style={S.pageLabel}>Pulse</div>
+
+      <div style={S.pulseCols}>
+        <div style={S.leftCol}>
+          {/* Today / Health card */}
+          <div
+            style={{
+              ...S.card,
+              ...S.todayCard,
+              background: HEALTH_GRADIENTS[hk],
+            }}
+          >
+            <div>
+              <div style={S.cardTitle}>Today</div>
+              <div style={S.todaySubtitle}>{health.subtitle}</div>
+            </div>
+            <div style={S.todayFooter}>
+              <div style={S.projectsBlock}>
+                <div style={S.projectsLabel}>Projects</div>
+                <div style={S.projectsValue}>{health.projects}</div>
+              </div>
+              <div style={S.statusBig}>{health.status}</div>
+            </div>
+          </div>
+
+          {/* To-Dos card */}
+          <div style={{ ...S.card, ...S.todosCard }}>
+            <div style={S.todosHeader}>
+              <div style={S.cardTitle}>To-Dos</div>
+              <div style={S.iconBtn}>
+                <IconPlus />
+              </div>
+            </div>
+            <ul style={S.todoList}>
+              {todos.map((t, i) => {
+                const focused = focusIdx === i;
+                return (
+                  <li
+                    key={t.id}
+                    style={{
+                      ...S.todoItem,
+                      background: focused
+                        ? 'rgba(0,0,0,0.03)'
+                        : 'transparent',
+                    }}
+                    onClick={() => {
+                      setFocusIdx(i);
+                      toggleTodo(t.id);
+                    }}
+                  >
+                    <span
+                      style={{
+                        ...S.checkbox,
+                        borderColor: t.done ? C.text : '#c0c0c0',
+                        background: t.done ? C.text : 'transparent',
+                      }}
+                    >
+                      {t.done && (
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 10 10"
+                          fill="none"
+                        >
+                          <path
+                            d="M2 5.2 L4.2 7.2 L8 3"
+                            stroke="#ffffff"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span
+                      style={{
+                        ...S.todoText,
+                        color: t.done ? C.textMuted : C.text,
+                        textDecoration: t.done ? 'line-through' : 'none',
+                      }}
+                    >
+                      {t.text}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div style={S.seeAll}>See All</div>
+          </div>
+        </div>
+
+        {/* Calendar card */}
+        <div style={{ ...S.card, ...S.calendarCard }}>
+          <div style={S.calendarHeader}>
+            <div style={S.monthNav}>
+              <IconChevron dir="left" />
+              <span style={S.monthName}>June</span>
+              <IconChevron dir="right" />
+            </div>
+            <div style={S.viewToggle}>
+              <div style={{ ...S.viewToggleBtn, background: '#ffffff' }}>
+                <IconGrid />
+              </div>
+              <div style={S.viewToggleBtn}>
+                <IconList />
+              </div>
+            </div>
+          </div>
+
+          <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
+            {mockData.pulse.calendar.map((d) => {
+              const bar = BAR_COLORS[d.color];
+              const isPast = !d.today && isBefore(d.date, 'July 17');
+              const color = isPast ? bar.faded : bar.active;
+              return (
+                <div key={d.date} style={S.calRow}>
+                  <div
+                    style={{
+                      ...S.calDate,
+                      color: d.today
+                        ? C.text
+                        : isPast
+                          ? 'rgba(164,164,164,0.55)'
+                          : C.textMuted,
+                      fontWeight: d.today ? 600 : 500,
+                    }}
+                  >
+                    {d.today ? 'Today' : d.date}
+                  </div>
+                  <div
+                    style={{
+                      ...S.calBar,
+                      width: BAR_WIDTHS[d.color] + '%',
+                      background: color,
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------- Canvas screen --------------------
+function CanvasScreen({ scrollRef }) {
+  return (
+    <div style={S.canvas}>
+      <div style={S.pageLabel}>All</div>
+      <div ref={scrollRef} className="kiosk-scroll" style={S.canvasScroll}>
+        {mockData.canvas.projects.map((p, i) => (
+          <div key={p.id} style={S.projectCard}>
+            <div style={S.thumb}>
+              <ProjectThumb seed={i} />
+            </div>
+            <div style={S.projectName}>{p.name}</div>
+            <div style={S.projectMeta}>Active • Edited 3h ago</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Decorative canvas-thumbnail pattern (mocked whiteboard look)
+function ProjectThumb({ seed }) {
+  const rects = [
+    { x: 20, y: 40, w: 44, h: 32, color: '#f5f5f5' },
+    { x: 72, y: 34, w: 30, h: 24, color: '#e6e6e6' },
+    { x: 110, y: 44, w: 40, h: 28, color: '#efefef' },
+    { x: 30, y: 80, w: 36, h: 24, color: '#eeeeee' },
+    { x: 78, y: 78, w: 48, h: 28, color: '#f0f0f0' },
+    { x: 132, y: 82, w: 22, h: 22, color: '#e6e6e6' },
+  ];
+  return (
+    <svg
+      viewBox="0 0 180 130"
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <rect width="180" height="130" fill="#fafafa" />
+      {rects.map((r, i) => (
+        <rect
+          key={i}
+          x={r.x + (seed % 3) * 2}
+          y={r.y}
+          width={r.w}
+          height={r.h}
+          rx="3"
+          fill={r.color}
+          stroke="#e5e5e5"
+          strokeWidth="0.6"
+        />
+      ))}
+      <path
+        d="M45 60 C 70 55, 90 70, 130 70"
+        stroke="#d4d4d4"
+        strokeWidth="0.8"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+// -------------------- Helpers --------------------
+function isBefore(a, b) {
+  // Compare "July 14" strings by day number
+  const dayA = parseInt(a.split(' ')[1], 10);
+  const dayB = parseInt(b.split(' ')[1], 10);
+  return dayA < dayB;
 }
 
 // -------------------- Styles --------------------
@@ -307,11 +477,19 @@ const S = {
     position: 'relative',
     width: 480,
     height: 480,
-    background: '#0a0a0a',
-    color: '#f5f5f5',
+    background: C.bg,
+    color: C.text,
     overflow: 'hidden',
     userSelect: 'none',
     WebkitUserSelect: 'none',
+  },
+
+  pageLabel: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: C.text,
+    letterSpacing: '-0.2px',
+    marginBottom: 8,
   },
 
   // ---- Pulse screen ----
@@ -320,211 +498,264 @@ const S = {
     height: '100%',
     padding: 14,
     paddingBottom: 30,
+    display: 'flex',
+    flexDirection: 'column',
   },
   pulseCols: {
-    display: 'flex',
-    gap: 12,
-    width: '100%',
-    height: '100%',
-  },
-  leftCol: {
     flex: 1,
     display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-    minWidth: 0,
+    gap: 10,
+    minHeight: 0,
   },
-  calendarCol: {
-    width: 110,
+  leftCol: {
+    flex: '1 1 58%',
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
-    overflowY: 'auto',
-    paddingRight: 2,
+    gap: 10,
+    minWidth: 0,
   },
 
-  healthCard: {
+  card: {
+    background: C.card,
     borderRadius: 14,
+    border: `1px solid ${C.border}`,
+    overflow: 'hidden',
+  },
+
+  // ---- Today card ----
+  todayCard: {
+    flex: '0 0 auto',
+    height: 172,
     padding: 14,
-    minHeight: 168,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
+    position: 'relative',
   },
-  statusWord: {
-    fontSize: 42,
-    fontWeight: 800,
-    letterSpacing: -1.2,
-    lineHeight: 1,
-    marginTop: 2,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 12,
-    lineHeight: 1.3,
-    color: 'rgba(255,255,255,0.78)',
-    maxWidth: 240,
-  },
-  statsRow: {
-    marginTop: 10,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  stat: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: 5,
-    fontSize: 11.5,
-  },
-  statLabel: {
-    color: 'rgba(255,255,255,0.65)',
-    fontWeight: 500,
-  },
-  statValue: {
-    color: '#fff',
+  cardTitle: {
+    fontSize: 17,
     fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.3px',
+    lineHeight: 1.1,
   },
-  statDivider: {
-    width: 1,
-    height: 12,
-    background: 'rgba(255,255,255,0.25)',
+  todaySubtitle: {
+    marginTop: 6,
+    fontSize: 12.5,
+    fontWeight: 500,
+    color: C.textMuted,
+    lineHeight: 1.35,
+    maxWidth: '68%',
+  },
+  todayFooter: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  projectsBlock: { display: 'flex', flexDirection: 'column', gap: 2 },
+  projectsLabel: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: C.textMuted,
+    letterSpacing: '0.2px',
+  },
+  projectsValue: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: C.text,
+    letterSpacing: '-0.2px',
+  },
+  statusBig: {
+    fontSize: 40,
+    fontWeight: 400,
+    color: C.text,
+    letterSpacing: '-2px',
+    lineHeight: 0.95,
+    textAlign: 'right',
   },
 
-  todosBlock: {
+  // ---- To-Dos card ----
+  todosCard: {
     flex: 1,
+    padding: 14,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
   },
-  sectionLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    color: '#737373',
-    marginBottom: 8,
-    fontWeight: 600,
+  todosHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iconBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    background: '#f5f5f5',
+    border: `1px solid ${C.border}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   todoList: {
     listStyle: 'none',
     padding: 0,
-    margin: 0,
+    margin: '10px 0 0 0',
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
+    gap: 2,
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
   },
   todoItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '10px 10px',
-    borderRadius: 10,
+    gap: 10,
+    padding: '4px 4px',
+    borderRadius: 6,
     cursor: 'pointer',
     transition: 'background 120ms ease',
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: '50%',
-    border: '1.5px solid #525252',
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    border: '1.4px solid #c0c0c0',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
     transition: 'all 120ms ease',
   },
-  check: {
-    color: '#0a0a0a',
-    fontSize: 13,
-    fontWeight: 900,
-    lineHeight: 1,
-  },
   todoText: {
-    fontSize: 14,
+    fontSize: 12.5,
     fontWeight: 500,
+    lineHeight: 1.2,
   },
   seeAll: {
     marginTop: 6,
-    fontSize: 12,
-    color: '#a3a3a3',
+    fontSize: 11,
+    color: C.textMuted,
     fontWeight: 500,
-    paddingLeft: 10,
   },
 
-  // ---- Calendar ----
+  // ---- Calendar card ----
+  calendarCard: {
+    flex: '1 1 42%',
+    padding: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  calendarHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  monthNav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  monthName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: C.text,
+    letterSpacing: '-0.3px',
+  },
+  viewToggle: {
+    display: 'flex',
+    background: '#f5f5f5',
+    borderRadius: 6,
+    padding: 2,
+    gap: 2,
+  },
+  viewToggleBtn: {
+    width: 22,
+    height: 20,
+    borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarBody: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-around',
+    overflowY: 'auto',
+    gap: 3,
+    paddingRight: 2,
+  },
   calRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    minHeight: 34,
+    gap: 6,
+    minHeight: 26,
   },
-  calDateBlock: {
-    width: 34,
-    flexShrink: 0,
-  },
-  calDay: {
-    fontSize: 16,
+  calDate: {
+    fontSize: 11,
+    fontWeight: 500,
+    textAlign: 'right',
+    flex: '0 0 50px',
     lineHeight: 1,
   },
-  todayLabel: {
-    marginTop: 2,
-    fontSize: 8,
-    letterSpacing: 0.8,
-    color: '#f5f5f5',
-    fontWeight: 700,
-  },
-  calBarTrack: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    background: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
-  },
   calBar: {
-    height: '100%',
-    borderRadius: 4,
+    height: 20,
+    borderRadius: 3,
     transition: 'width 200ms ease',
+    minWidth: 30,
   },
 
   // ---- Canvas screen ----
   canvas: {
     width: '100%',
     height: '100%',
-    padding: 18,
+    padding: 14,
     paddingBottom: 30,
-    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
   },
-  workspaceLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: '#737373',
-    marginBottom: 14,
-    fontWeight: 600,
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 14,
+  canvasScroll: {
+    flex: 1,
+    display: 'flex',
+    gap: 12,
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    paddingBottom: 4,
+    scrollSnapType: 'x mandatory',
   },
   projectCard: {
+    flex: '0 0 auto',
+    width: 200,
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
+    scrollSnapAlign: 'start',
   },
   thumb: {
     width: '100%',
-    aspectRatio: '4 / 3',
+    height: 200,
     borderRadius: 10,
-    background:
-      'linear-gradient(135deg, #262626 0%, #1a1a1a 100%)',
-    border: '1px solid #262626',
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    overflow: 'hidden',
   },
   projectName: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: 600,
+    color: C.text,
+    letterSpacing: '-0.2px',
+  },
+  projectMeta: {
+    fontSize: 11,
     fontWeight: 500,
-    color: '#e5e5e5',
+    color: C.textMuted,
+    marginTop: -4,
   },
 
   // ---- Dots ----
