@@ -197,6 +197,7 @@ export default function App() {
   const canvasScrollRef = useRef(null);
 
   const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
+  const centerCal = (idx) => setCalStart(clampCalStart(idx - CAL_CENTER));
 
   const toggleTodo = (id) =>
     setTodos((prev) =>
@@ -259,6 +260,7 @@ export default function App() {
             toggleTodo={toggleTodo}
             calStart={calStart}
             stepCal={stepCal}
+            centerCal={centerCal}
           />
         ) : (
           <CanvasScreen scrollRef={canvasScrollRef} />
@@ -290,11 +292,14 @@ function PulseScreen({
   toggleTodo,
   calStart,
   stepCal,
+  centerCal,
 }) {
   // Wheel and drag both accumulate distance and spend it a whole day at a time,
   // so the window never lands between days.
   const wheelAcc = useRef(0);
-  const dragFrom = useRef(null);
+  const dragFrom = useRef(null); // moving reference, drawn down as steps are spent
+  const dragOrigin = useRef(null); // fixed, only to tell a tap from a drag
+  const dragged = useRef(false);
 
   const onWheel = (e) => {
     wheelAcc.current += e.deltaY;
@@ -307,10 +312,14 @@ function PulseScreen({
 
   const onCalTouchStart = (e) => {
     dragFrom.current = e.touches[0].clientY;
+    dragOrigin.current = e.touches[0].clientY;
+    dragged.current = false;
   };
   const onCalTouchMove = (e) => {
     if (dragFrom.current == null) return;
-    const dy = dragFrom.current - e.touches[0].clientY; // drag up → later days
+    const y = e.touches[0].clientY;
+    if (Math.abs(dragOrigin.current - y) > 6) dragged.current = true;
+    const dy = dragFrom.current - y; // drag up → later days
     const days = Math.trunc(dy / CAL_ROW_PITCH);
     if (days) {
       dragFrom.current -= days * CAL_ROW_PITCH;
@@ -319,6 +328,16 @@ function PulseScreen({
   };
   const onCalTouchEnd = () => {
     dragFrom.current = null;
+  };
+
+  // Tapping a day brings it to the center — but a drag ends in a click too, so
+  // only an unmoved finger counts as a tap.
+  const onDayClick = (idx) => {
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    centerCal(idx);
   };
 
   // The Today card reads off the centered day, so both panels stay in step.
@@ -466,7 +485,11 @@ function PulseScreen({
                   const isPast = TODAY_IDX >= 0 && idx < TODAY_IDX && !isCenter;
                   const fill = isPast ? bar.faded : bar.active;
                   return (
-                    <div key={d.date} style={S.calRow}>
+                    <div
+                      key={d.date}
+                      style={S.calRow}
+                      onClick={() => onDayClick(idx)}
+                    >
                       <div
                         style={{
                           ...S.calDate,
@@ -808,6 +831,7 @@ const S = {
     justifyContent: 'center',
     gap: 12,
     flexShrink: 0,
+    cursor: 'pointer',
   },
   calDate: {
     fontSize: 12,
