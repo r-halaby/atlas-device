@@ -712,7 +712,7 @@ const S = {
   },
   calBar: {
     height: 22,
-    borderRadius: 999,
+    borderRadius: 8,
     transition: 'width 200ms ease, background 200ms ease',
     flexShrink: 0,
   },
