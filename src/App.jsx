@@ -20,7 +20,6 @@ const mockData = {
       { date: 'July 18', color: 'yellow' },
       { date: 'July 19', color: 'yellow' },
       { date: 'July 20', color: 'red' },
-      { date: 'July 21', color: 'red' },
     ],
   },
   canvas: {
@@ -67,12 +66,10 @@ const BAR_COLORS = {
 };
 
 // Bar width encodes relative workload (in px, sized for the ~210px calendar card)
-function barPx(d, i) {
+function barPx(d) {
   const base = { green: 85, yellow: 85, red: 70 }[d.color];
   const todayBonus = d.today ? 28 : 0;
-  // Slight taper on trailing reds so the last row looks lightest
-  const redTaper = d.color === 'red' && i === mockData.pulse.calendar.length - 1 ? -18 : 0;
-  return base + todayBonus + redTaper;
+  return base + todayBonus;
 }
 
 function statusKey(status) {
@@ -367,7 +364,7 @@ function PulseScreen({
           </div>
 
           <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
-            {mockData.pulse.calendar.map((d, i) => {
+            {mockData.pulse.calendar.map((d) => {
               const bar = BAR_COLORS[d.color];
               const isPast = !d.today && isBefore(d.date, 'July 17');
               const fill = isPast ? bar.faded : bar.active;
@@ -385,7 +382,8 @@ function PulseScreen({
                   <div
                     style={{
                       ...S.calBar,
-                      width: barPx(d, i),
+                      width: barPx(d),
+                      height: d.today ? 48 : 40,
                       background: fill,
                     }}
                   />
@@ -494,7 +492,7 @@ const S = {
     fontWeight: 500,
     color: C.text,
     letterSpacing: '-0.2px',
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   // ---- Pulse screen ----
@@ -502,7 +500,7 @@ const S = {
     width: '100%',
     height: '100%',
     padding: 14,
-    paddingBottom: 30,
+    paddingBottom: 24,
     display: 'flex',
     flexDirection: 'column',
   },
@@ -711,9 +709,8 @@ const S = {
     letterSpacing: '-0.1px',
   },
   calBar: {
-    height: 22,
     borderRadius: 8,
-    transition: 'width 200ms ease, background 200ms ease',
+    transition: 'width 200ms ease, height 200ms ease, background 200ms ease',
     flexShrink: 0,
   },
 
