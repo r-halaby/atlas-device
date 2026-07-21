@@ -65,11 +65,12 @@ const BAR_COLORS = {
   red: { active: C.red, faded: '#f5a58f' },
 };
 
-// Bar width encodes relative workload (in px, sized for the ~210px calendar card)
-function barPx(d) {
-  const base = { green: 85, yellow: 85, red: 70 }[d.color];
-  const todayBonus = d.today ? 28 : 0;
-  return base + todayBonus;
+// Bar width tapers by distance from Today (index) — Today is widest, edges narrowest.
+const TODAY_IDX = mockData.pulse.calendar.findIndex((d) => d.today);
+const BAR_WIDTHS_BY_DIST = [128, 108, 92, 74];
+function barPx(i) {
+  const dist = Math.abs(i - TODAY_IDX);
+  return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
 }
 
 function statusKey(status) {
@@ -364,7 +365,7 @@ function PulseScreen({
           </div>
 
           <div ref={calendarRef} className="kiosk-scroll" style={S.calendarBody}>
-            {mockData.pulse.calendar.map((d) => {
+            {mockData.pulse.calendar.map((d, i) => {
               const bar = BAR_COLORS[d.color];
               const isPast = !d.today && isBefore(d.date, 'July 17');
               const fill = isPast ? bar.faded : bar.active;
@@ -382,7 +383,7 @@ function PulseScreen({
                   <div
                     style={{
                       ...S.calBar,
-                      width: barPx(d),
+                      width: barPx(i),
                       height: d.today ? 48 : 40,
                       background: fill,
                     }}
