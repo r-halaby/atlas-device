@@ -29,3 +29,24 @@ export const MOCK_TIMER = {
 };
 
 export const MOCK_NOTES = [];
+
+// For the Sage chat swipe page (separate from the hardware-button Sage
+// overlay). Canned replies live in App.jsx; this is just the framing copy.
+export const MOCK_SAGE = {
+  tagline: 'Intelligence layer for design operations',
+  intro: {
+    lead: 'Sage is active. I maintain shared understanding across your goals, decisions, and revisions so your team stays aligned as work evolves.',
+    listLead: 'I can help you:',
+    bullets: [
+      'Surface and classify feedback across the project',
+      'Flag when work has drifted from stated intent',
+      'Log and retrieve key decisions as they’re made',
+      'Execute canvas actions through natural language',
+    ],
+  },
+  history: [
+    { id: 1, title: 'One of the stakeholders on the Puma inv…', date: '6/12/2026' },
+    { id: 2, title: 'Summarise the Creator Day feedback', date: '6/9/2026' },
+    { id: 3, title: 'What changed on Vega Launch Deck?', date: '5/28/2026' },
+  ],
+};
