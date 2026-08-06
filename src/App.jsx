@@ -135,11 +135,23 @@ const BAR_COLORS = {
 const CAL_DAYS = mockData.pulse.calendar;
 const TODAY_IDX = CAL_DAYS.findIndex((d) => d.today);
 
+// Design canvas stays 480; the frame is rendered onto a 720x720 panel via
+// CSS zoom, so all pixel constants below are in DESIGN space.
+const DESIGN_SIZE = 480;
+const PANEL_SIZE = 720;
+const SCALE = PANEL_SIZE / DESIGN_SIZE;
+
 // Seven days on screen at a time; the middle slot is the focal one.
 const CAL_WINDOW = 7;
 const CAL_CENTER = (CAL_WINDOW - 1) / 2;
 const CAL_MAX_START = Math.max(0, CAL_DAYS.length - CAL_WINDOW);
 const CAL_ROW_PITCH = 48; // row height + gap — converts drag distance into days
+
+// clientX/clientY from touch events are in VIEWPORT pixels, not design pixels.
+// Interaction thresholds that compare against those deltas must be scaled up
+// so a "one row drag" and a "swipe" feel the same on the 720 panel as on 480.
+const SWIPE_THRESHOLD = 45 * SCALE;
+const CAL_ROW_PITCH_VIEWPORT = CAL_ROW_PITCH * SCALE;
 
 const clampCalStart = (i) => Math.max(0, Math.min(CAL_MAX_START, i));
 
@@ -266,7 +278,7 @@ export default function App() {
     const t = e.changedTouches[0];
     const dx = t.clientX - touchStartX.current;
     const dy = t.clientY - touchStartY.current;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+    if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
       // While the to-do page is up it owns the gesture: swipe back to leave,
       // and don't let a swipe change the screen underneath it.
       if (todosOpen) {
@@ -392,9 +404,9 @@ function PulseScreen({
 
   const onWheel = (e) => {
     wheelAcc.current += e.deltaY;
-    const days = Math.trunc(wheelAcc.current / CAL_ROW_PITCH);
+    const days = Math.trunc(wheelAcc.current / CAL_ROW_PITCH_VIEWPORT);
     if (days) {
-      wheelAcc.current -= days * CAL_ROW_PITCH;
+      wheelAcc.current -= days * CAL_ROW_PITCH_VIEWPORT;
       stepCal(days);
     }
   };
@@ -407,11 +419,11 @@ function PulseScreen({
   const onCalTouchMove = (e) => {
     if (dragFrom.current == null) return;
     const y = e.touches[0].clientY;
-    if (Math.abs(dragOrigin.current - y) > 6) dragged.current = true;
+    if (Math.abs(dragOrigin.current - y) > 6 * SCALE) dragged.current = true;
     const dy = dragFrom.current - y; // drag up → later days
-    const days = Math.trunc(dy / CAL_ROW_PITCH);
+    const days = Math.trunc(dy / CAL_ROW_PITCH_VIEWPORT);
     if (days) {
-      dragFrom.current -= days * CAL_ROW_PITCH;
+      dragFrom.current -= days * CAL_ROW_PITCH_VIEWPORT;
       stepCal(days);
     }
   };
@@ -864,8 +876,13 @@ const S = {
   },
   frame: {
     position: 'relative',
-    width: 480,
-    height: 480,
+    width: DESIGN_SIZE,
+    height: DESIGN_SIZE,
+    // Chromium's CSS zoom scales layout, painting, and event coordinates
+    // together — cheaper than replacing every pixel constant, and keeps the
+    // design canvas at 480 to match Figma. Firefox/Safari added support later
+    // than Chromium, but the kiosk only runs Chromium so this is safe here.
+    zoom: SCALE,
     background: C.bg,
     color: C.text,
     overflow: 'hidden',
