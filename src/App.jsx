@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { anyApi } from 'convex/server';
 import { MOCK_TODOS } from './mockTodos.js';
+import SplashScreen from './SplashScreen.jsx';
 
 // Kiosk runs against Convex when a URL is configured; otherwise it renders
 // mock todos so design work keeps flowing while the backend catches up.
@@ -238,6 +239,8 @@ export default function App() {
   const [facets, setFacets] = useState({ canvas: ANY_CANVAS });
   // Index of the first day in the visible 7-day calendar window.
   const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
+  // Splash plays every load — on the Pi, "every load" == "every boot".
+  const [splashDone, setSplashDone] = useState(false);
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
@@ -333,6 +336,7 @@ export default function App() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
+        {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         {todosOpen ? (
           <TodosScreen
             todos={pageTodos}
