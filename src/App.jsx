@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { anyApi } from 'convex/server';
-import { MOCK_TODOS } from './mockTodos.js';
+import { MOCK_TODOS, MOCK_PROJECTS, MOCK_TIMER, MOCK_NOTES } from './mock/mockData.js';
+import { createMockSageAPI } from './mock/mockSageAPI.js';
+import { useSage } from './hooks/useSage.js';
 import SplashScreen from './SplashScreen.jsx';
+import SageOverlay from './components/SageOverlay.jsx';
 
 // Kiosk runs against Convex when a URL is configured; otherwise it renders
 // mock todos so design work keeps flowing while the backend catches up.
@@ -231,7 +234,7 @@ const IconList = ({ size = 12 }) => (
 // -------------------- Component --------------------
 export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
-  const { todos, toggleTodo } = useTodoData();
+  const { todos: baseTodos, toggleTodo: baseToggle } = useTodoData();
   const [focusIdx, setFocusIdx] = useState(0);
   // See All covers the whole frame with the full to-do list.
   const [todosOpen, setTodosOpen] = useState(false);
@@ -241,6 +244,46 @@ export default function App() {
   const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
   // Splash plays every load — on the Pi, "every load" == "every boot".
   const [splashDone, setSplashDone] = useState(false);
+
+  // Sage state lives here so mockSageAPI's setters and the display code can
+  // both reach it. Todos added by Sage go into their own bucket and are
+  // concatenated with the primary list, so Sage never touches the (possibly
+  // Convex-backed) primary state.
+  const [sageAddedTodos, setSageAddedTodos] = useState([]);
+  const [projects, setProjects] = useState(MOCK_PROJECTS);
+  const [timer, setTimer] = useState(MOCK_TIMER);
+  const [notes, setNotes] = useState(MOCK_NOTES);
+
+  const todos = useMemo(
+    () => [...baseTodos, ...sageAddedTodos],
+    [baseTodos, sageAddedTodos],
+  );
+
+  const toggleTodo = (todo) => {
+    if (!todo) return;
+    if (sageAddedTodos.some((t) => t.todoId === todo.todoId)) {
+      setSageAddedTodos((prev) =>
+        prev.map((t) => (t.todoId === todo.todoId ? { ...t, completed: !t.completed } : t)),
+      );
+    } else {
+      baseToggle(todo);
+    }
+  };
+
+  const sageAPI = useMemo(
+    () => createMockSageAPI({
+      setTodos: setSageAddedTodos,
+      setProjects,
+      setTimer,
+      setNotes,
+      setScreen,
+    }),
+    [],
+  );
+
+  const sage = useSage({
+    onConfirm: (action) => sageAPI.dispatch(action, projects),
+  });
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
@@ -337,6 +380,15 @@ export default function App() {
         onTouchEnd={onTouchEnd}
       >
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+        <SageOverlay
+          view={sage.view}
+          pendingAction={sage.pendingAction}
+          error={sage.error}
+          projects={projects}
+          onConfirm={sage.confirm}
+          onCancel={sage.cancel}
+          onChooseCandidate={sage.chooseAmbiguousOption}
+        />
         {todosOpen ? (
           <TodosScreen
             todos={pageTodos}
