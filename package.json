@@ -7,13 +7,16 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173"
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "mint-token": "node scripts/mint-kiosk-token.mjs"
   },
   "dependencies": {
+    "convex": "^1.43.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@clerk/backend": "^3.15.1",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^5.4.11"
   }
