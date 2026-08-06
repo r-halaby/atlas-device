@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Atlas Pulse kiosk UI — 480x480 for Raspberry Pi",
+  "description": "Atlas Pulse kiosk UI — 480x480 design scaled to 720x720 Waveshare panel on Raspberry Pi",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
