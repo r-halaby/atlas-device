@@ -1,4 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { anyApi } from 'convex/server';
+import { MOCK_TODOS } from './mockTodos.js';
+
+// Kiosk runs against Convex when a URL is configured; otherwise it renders
+// mock todos so design work keeps flowing while the backend catches up.
+const USE_CONVEX = Boolean(import.meta.env.VITE_CONVEX_URL);
+
+function useConvexTodos() {
+  const todos = useQuery(anyApi.canvasTodos.listOrgTodos) ?? [];
+  const mutate = useMutation(anyApi.canvasTodos.toggleOrgTodo);
+  const toggleTodo = (todo) => {
+    if (!todo) return;
+    mutate({ nodeId: todo.nodeId, todoId: todo.todoId, completed: !todo.completed });
+  };
+  return { todos, toggleTodo };
+}
+
+function useMockTodos() {
+  const [todos, setTodos] = useState(MOCK_TODOS);
+  const toggleTodo = (todo) => {
+    if (!todo) return;
+    setTodos((prev) =>
+      prev.map((t) =>
+        t.todoId === todo.todoId ? { ...t, completed: !t.completed } : t,
+      ),
+    );
+  };
+  return { todos, toggleTodo };
+}
+
+const useTodoData = USE_CONVEX ? useConvexTodos : useMockTodos;
 
 // -------------------- Mock data --------------------
 // The calendar holds a whole month; only CAL_WINDOW days sit on screen at once
@@ -29,91 +61,6 @@ function buildCalendar() {
 
 const mockData = {
   pulse: {
-    cashFlow: '87%',
-    // More than the Pulse card can show — the card lists what fits and
-    // See All opens the rest.
-    todos: [
-      {
-        id: 1,
-        text: 'Update deck design',
-        done: false,
-        collection: 'No Collection',
-        file: 'puma_f1_files',
-        canvas: 'Puma Invite Concepts-02',
-        assignee: null,
-        dueIn: 2,
-      },
-      {
-        id: 2,
-        text: 'Schedule meeting with Brian',
-        done: false,
-        collection: 'No Collection',
-        file: 'puma_f1_files',
-        canvas: 'Puma Invite Concepts-02',
-        assignee: null,
-        dueIn: -39,
-      },
-      {
-        id: 3,
-        text: 'Review quarterly data with Rahmi',
-        done: false,
-        collection: 'No Collection',
-        file: 'Creator Day Design',
-        canvas: 'Creator Day Concepts-01',
-        assignee: 'AC',
-        dueIn: 0,
-      },
-      {
-        id: 4,
-        text: 'Send Northwind the revised invoice',
-        done: false,
-        collection: 'Finance',
-        file: 'northwind_files',
-        canvas: 'Northwind Retainer-01',
-        assignee: null,
-        dueIn: 5,
-      },
-      {
-        id: 5,
-        text: 'Draft Q3 retainer proposal',
-        done: false,
-        collection: 'Q3 Planning',
-        file: 'northwind_files',
-        canvas: 'Northwind Retainer-02',
-        assignee: 'RH',
-        dueIn: 12,
-      },
-      {
-        id: 6,
-        text: 'Pull analytics for the Vega launch',
-        done: true,
-        collection: 'No Collection',
-        file: 'vega_launch',
-        canvas: 'Vega Launch Deck-02',
-        assignee: 'RH',
-        dueIn: null,
-      },
-      {
-        id: 7,
-        text: 'Reply to Priya about the workshop',
-        done: false,
-        collection: 'No Collection',
-        file: 'creator_day',
-        canvas: 'Creator Day Concepts-03',
-        assignee: 'AC',
-        dueIn: -4,
-      },
-      {
-        id: 8,
-        text: 'Archive last quarter\u2019s canvases',
-        done: true,
-        collection: 'Housekeeping',
-        file: 'archive_2026',
-        canvas: 'Q2 Canvases',
-        assignee: null,
-        dueIn: null,
-      },
-    ],
     calendar: buildCalendar(),
   },
   canvas: {
@@ -271,16 +218,12 @@ const IconList = ({ size = 12 }) => (
 // -------------------- Component --------------------
 export default function App() {
   const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
-  const [todos, setTodos] = useState(mockData.pulse.todos);
+  const { todos, toggleTodo } = useTodoData();
   const [focusIdx, setFocusIdx] = useState(0);
   // See All covers the whole frame with the full to-do list.
   const [todosOpen, setTodosOpen] = useState(false);
   const [todoFilter, setTodoFilter] = useState('all'); // all | open | done
-  const [facets, setFacets] = useState({
-    canvas: ANY_CANVAS,
-    user: ANY_USER,
-    date: ANY_DATE,
-  });
+  const [facets, setFacets] = useState({ canvas: ANY_CANVAS });
   // Index of the first day in the visible 7-day calendar window.
   const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
 
@@ -291,11 +234,6 @@ export default function App() {
   const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
   const centerCal = (idx) => setCalStart(clampCalStart(idx - CAL_CENTER));
 
-  const toggleTodo = (id) =>
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-
   const changeFilter = (f) => {
     setTodoFilter(f);
     setFocusIdx(0);
@@ -305,30 +243,17 @@ export default function App() {
     setFocusIdx(0);
   };
 
-  // Options come off the whole list, not the filtered one, so narrowing by
-  // canvas doesn't empty out the user and date menus.
   const facetOptions = {
-    canvas: [ANY_CANVAS, ...new Set(todos.map((t) => t.canvas))],
-    user: [
-      ANY_USER,
-      ...new Set(todos.filter((t) => t.assignee).map((t) => t.assignee)),
-      UNASSIGNED,
-    ],
-    date: DATE_OPTIONS,
+    canvas: [ANY_CANVAS, ...new Set(todos.map((t) => t.canvasName))],
   };
 
   // What the to-do page is showing. Keyboard focus walks this same list, so it
   // can never land on a row the filters are hiding.
   const pageTodos = todos.filter((t) => {
-    if (todoFilter === 'open' && t.done) return false;
-    if (todoFilter === 'done' && !t.done) return false;
-    if (facets.canvas !== ANY_CANVAS && t.canvas !== facets.canvas) return false;
-    if (facets.user === UNASSIGNED) {
-      if (t.assignee) return false;
-    } else if (facets.user !== ANY_USER && t.assignee !== facets.user) {
-      return false;
-    }
-    return matchesDate(t, facets.date);
+    if (todoFilter === 'open' && t.completed) return false;
+    if (todoFilter === 'done' && !t.completed) return false;
+    if (facets.canvas !== ANY_CANVAS && t.canvasName !== facets.canvas) return false;
+    return true;
   });
 
   const onTouchStart = (e) => {
@@ -364,7 +289,7 @@ export default function App() {
           );
         } else if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          if (pageTodos[focusIdx]) toggleTodo(pageTodos[focusIdx].id);
+          toggleTodo(pageTodos[focusIdx]);
         }
         return;
       }
@@ -381,7 +306,7 @@ export default function App() {
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
           e.preventDefault();
-          toggleTodo(todos[focusIdx].id);
+          toggleTodo(todos[focusIdx]);
         }
       }
     };
@@ -552,7 +477,7 @@ function PulseScreen({
                 const focused = focusIdx === i;
                 return (
                   <li
-                    key={t.id}
+                    key={t.todoId}
                     style={{
                       ...S.todoItem,
                       background: focused
@@ -561,17 +486,17 @@ function PulseScreen({
                     }}
                     onClick={() => {
                       setFocusIdx(i);
-                      toggleTodo(t.id);
+                      toggleTodo(t);
                     }}
                   >
                     <span
                       style={{
                         ...S.checkbox,
-                        borderColor: t.done ? C.text : '#c0c0c0',
-                        background: t.done ? C.text : 'transparent',
+                        borderColor: t.completed ? C.text : '#c0c0c0',
+                        background: t.completed ? C.text : 'transparent',
                       }}
                     >
-                      {t.done && (
+                      {t.completed && (
                         <svg
                           width="10"
                           height="10"
@@ -591,11 +516,11 @@ function PulseScreen({
                     <span
                       style={{
                         ...S.todoText,
-                        color: t.done ? C.textMuted : C.text,
-                        textDecoration: t.done ? 'line-through' : 'none',
+                        color: t.completed ? C.textMuted : C.text,
+                        textDecoration: t.completed ? 'line-through' : 'none',
                       }}
                     >
-                      {t.text}
+                      {t.title}
                     </span>
                   </li>
                 );
@@ -692,26 +617,6 @@ function PulseScreen({
 const TODO_FILTERS = ['All', 'Open', 'Done'];
 
 const ANY_CANVAS = 'All Canvases';
-const ANY_USER = 'All Users';
-const ANY_DATE = 'Any Date';
-const UNASSIGNED = 'Unassigned';
-const DATE_OPTIONS = [ANY_DATE, 'Overdue', 'Due today', 'Next 7 days', 'No date'];
-
-// dueIn is days from today: negative is overdue, null is undated.
-function matchesDate(t, opt) {
-  switch (opt) {
-    case 'Overdue':
-      return t.dueIn != null && t.dueIn < 0;
-    case 'Due today':
-      return t.dueIn === 0;
-    case 'Next 7 days':
-      return t.dueIn != null && t.dueIn >= 0 && t.dueIn <= 7;
-    case 'No date':
-      return t.dueIn == null;
-    default:
-      return true;
-  }
-}
 
 function TodosScreen({
   todos,
@@ -726,12 +631,10 @@ function TodosScreen({
   toggleTodo,
   onBack,
 }) {
-  const [openMenu, setOpenMenu] = useState(null); // canvas | user | date | null
+  const [openMenu, setOpenMenu] = useState(null); // canvas | null
 
   const FACETS = [
     { key: 'canvas', any: ANY_CANVAS },
-    { key: 'user', any: ANY_USER },
-    { key: 'date', any: ANY_DATE },
   ];
 
   return (
@@ -826,14 +729,14 @@ function TodosScreen({
           const focused = focusIdx === i;
           return (
             <li
-              key={t.id}
+              key={t.todoId}
               style={{
                 ...S.todoRow,
                 background: focused ? 'rgba(0,0,0,0.03)' : 'transparent',
               }}
               onClick={() => {
                 setFocusIdx(i);
-                toggleTodo(t.id);
+                toggleTodo(t);
               }}
             >
               <span
@@ -843,11 +746,11 @@ function TodosScreen({
                   height: 16,
                   borderRadius: 4,
                   marginTop: 1,
-                  borderColor: t.done ? C.text : '#d4d4d4',
-                  background: t.done ? C.text : 'transparent',
+                  borderColor: t.completed ? C.text : '#d4d4d4',
+                  background: t.completed ? C.text : 'transparent',
                 }}
               >
-                {t.done && (
+                {t.completed && (
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <path
                       d="M2 5.2 L4.2 7.2 L8 3"
@@ -865,22 +768,15 @@ function TodosScreen({
                   <span
                     style={{
                       ...S.todoRowTitle,
-                      color: t.done ? C.textMuted : C.text,
-                      textDecoration: t.done ? 'line-through' : 'none',
+                      color: t.completed ? C.textMuted : C.text,
+                      textDecoration: t.completed ? 'line-through' : 'none',
                     }}
                   >
-                    {t.text}
+                    {t.title}
                   </span>
-                  {t.dueIn != null && t.dueIn < 0 && !t.done && (
-                    <span style={S.overduePill}>{-t.dueIn}d overdue</span>
-                  )}
                 </div>
-                <div style={S.todoRowMeta}>
-                  {[t.collection, t.file, t.canvas].join('  ·  ')}
-                </div>
+                <div style={S.todoRowMeta}>{t.canvasName}</div>
               </div>
-
-              {t.assignee && <span style={S.avatar}>{t.assignee}</span>}
             </li>
           );
         })}
@@ -1312,17 +1208,6 @@ const S = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  overduePill: {
-    fontSize: 9,
-    fontWeight: 500,
-    color: C.red,
-    background: '#fdecea',
-    padding: '2px 5px',
-    borderRadius: 4,
-    lineHeight: 1,
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  },
   todoRowMeta: {
     marginTop: 3,
     fontSize: 9.5,
@@ -1332,20 +1217,6 @@ const S = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-  },
-  avatar: {
-    width: 20,
-    height: 20,
-    borderRadius: '50%',
-    background: '#e8e8e8',
-    color: C.textMedium,
-    fontSize: 8.5,
-    fontWeight: 600,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    marginTop: 1,
   },
   todosEmpty: {
     padding: '20px 14px',
