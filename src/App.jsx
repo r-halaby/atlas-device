@@ -165,8 +165,16 @@ const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const CAL_LEAD_BLANKS =
   (new Date(CAL_YEAR, CAL_MONTH_INDEX, 1).getDay() + 6) % 7;
 
-// Four swipe pages: 0=Pulse, 1=Canvases, 2=Sage, 3=Clock.
+// Four swipe pages, in left-to-right order. Clock is the leftmost — the
+// "resting" state — so swiping right from Pulse reveals it.
+const SCREEN_CLOCK = 0;
+const SCREEN_PULSE = 1;
+const SCREEN_CANVAS = 2;
+const SCREEN_SAGE = 3;
 const SCREEN_COUNT = 4;
+// Boot into Pulse rather than the clock — the kiosk is a productivity device
+// first; the clock is an accessory.
+const SCREEN_DEFAULT = SCREEN_PULSE;
 
 // Sage chat thread — canned replies since there's no live model behind the
 // swipe-page chat. The hardware-button Sage overlay (SageOverlay + useSage)
@@ -311,7 +319,7 @@ const IconList = ({ size = 12 }) => (
 
 // -------------------- Component --------------------
 export default function App() {
-  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas, 2=sage
+  const [screen, setScreen] = useState(SCREEN_DEFAULT);
   const { todos: baseTodos, toggleTodo: baseToggle } = useTodoData();
   const [focusIdx, setFocusIdx] = useState(0);
   // See All covers the whole frame with the full to-do list; the calendar's
@@ -464,17 +472,17 @@ export default function App() {
         setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
-        if (screen === 0) {
+        if (screen === SCREEN_PULSE) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           stepCal(dir);
-        } else if (screen === 1) {
+        } else if (screen === SCREEN_CANVAS) {
           canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
-        } else if (screen === 2) {
+        } else if (screen === SCREEN_SAGE) {
           chatScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
-        // Clock (3) has nothing to scroll.
+        // Clock has nothing to scroll.
       } else if (e.key === 'Enter' || e.key === ' ') {
-        if (screen === 0 && todos[focusIdx]) {
+        if (screen === SCREEN_PULSE && todos[focusIdx]) {
           e.preventDefault();
           toggleTodo(todos[focusIdx]);
         }
@@ -523,7 +531,9 @@ export default function App() {
               setMonthOpen(false);
             }}
           />
-        ) : screen === 0 ? (
+        ) : screen === SCREEN_CLOCK ? (
+          <ClockScreen />
+        ) : screen === SCREEN_PULSE ? (
           <PulseScreen
             todos={todos}
             focusIdx={focusIdx}
@@ -535,17 +545,15 @@ export default function App() {
             onSeeAll={() => setTodosOpen(true)}
             onOpenMonth={() => setMonthOpen(true)}
           />
-        ) : screen === 1 ? (
+        ) : screen === SCREEN_CANVAS ? (
           <CanvasScreen scrollRef={canvasScrollRef} />
-        ) : screen === 2 ? (
+        ) : (
           <SageScreen
             messages={messages}
             onSend={sendMessage}
             onNewChat={newChat}
             scrollRef={chatScrollRef}
           />
-        ) : (
-          <ClockScreen />
         )}
 
         {/* The dots for Pulse, Canvases, Sage, Clock — full-frame pages
