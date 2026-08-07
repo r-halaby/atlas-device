@@ -280,18 +280,16 @@ const IconSend = ({ size = 14 }) => (
 );
 
 // Sage's mark: a dotted cluster on a black disc.
+// Sage brand mark — served from public/ so a brand refresh is a file swap,
+// not a code edit. SVG so it stays crisp at every callsite size.
 const SageMark = ({ size = 34 }) => (
-  <svg width={size} height={size} viewBox="0 0 34 34">
-    <circle cx="17" cy="17" r="17" fill="#0a0a0a" />
-    {[
-      [12, 11], [17, 11], [22, 11],
-      [12, 15.5], [17, 15.5], [22, 15.5],
-      [12, 20], [17, 20], [22, 20],
-      [14.5, 24], [19.5, 24],
-    ].map(([x, y], i) => (
-      <circle key={i} cx={x} cy={y} r="1.5" fill="#3d3d3d" />
-    ))}
-  </svg>
+  <img
+    src="/sage-mark.svg"
+    width={size}
+    height={size}
+    alt=""
+    style={{ display: 'block', flexShrink: 0 }}
+  />
 );
 
 const IconGrid = ({ size = 12 }) => (
