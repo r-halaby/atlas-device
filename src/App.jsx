@@ -280,16 +280,30 @@ const IconSend = ({ size = 14 }) => (
 );
 
 // Sage's mark: a dotted cluster on a black disc.
-// Sage brand mark — served from public/ so a brand refresh is a file swap,
-// not a code edit. SVG so it stays crisp at every callsite size.
+// Sage brand mark on a black disc. Yellow-on-white has too little contrast
+// on the chat page, so the disc gives the mark somewhere to sit. Mark is
+// ~65% of the disc — matches the composition of the original placeholder.
 const SageMark = ({ size = 34 }) => (
-  <img
-    src="/sage-mark.svg"
-    width={size}
-    height={size}
-    alt=""
-    style={{ display: 'block', flexShrink: 0 }}
-  />
+  <span
+    style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: '#0a0a0a',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src="/sage-mark.svg"
+      width={size * 0.65}
+      height={size * 0.65}
+      alt=""
+      style={{ display: 'block' }}
+    />
+  </span>
 );
 
 const IconGrid = ({ size = 12 }) => (
