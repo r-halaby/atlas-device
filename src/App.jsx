@@ -6,6 +6,7 @@ import { createMockSageAPI } from './mock/mockSageAPI.js';
 import { useSage } from './hooks/useSage.js';
 import SplashScreen from './SplashScreen.jsx';
 import SageOverlay from './components/SageOverlay.jsx';
+import ClockScreen from './components/ClockScreen.jsx';
 
 // Kiosk runs against Convex when a URL is configured; otherwise it renders
 // mock todos so design work keeps flowing while the backend catches up.
@@ -164,8 +165,8 @@ const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const CAL_LEAD_BLANKS =
   (new Date(CAL_YEAR, CAL_MONTH_INDEX, 1).getDay() + 6) % 7;
 
-// Three swipe pages: 0=Pulse, 1=Canvases, 2=Sage.
-const SCREEN_COUNT = 3;
+// Four swipe pages: 0=Pulse, 1=Canvases, 2=Sage, 3=Clock.
+const SCREEN_COUNT = 4;
 
 // Sage chat thread — canned replies since there's no live model behind the
 // swipe-page chat. The hardware-button Sage overlay (SageOverlay + useSage)
@@ -466,10 +467,12 @@ export default function App() {
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           stepCal(dir);
-        } else {
-          const ref = screen === 1 ? canvasScrollRef : chatScrollRef;
-          ref.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
+        } else if (screen === 1) {
+          canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
+        } else if (screen === 2) {
+          chatScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
+        // Clock (3) has nothing to scroll.
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
           e.preventDefault();
@@ -534,20 +537,22 @@ export default function App() {
           />
         ) : screen === 1 ? (
           <CanvasScreen scrollRef={canvasScrollRef} />
-        ) : (
+        ) : screen === 2 ? (
           <SageScreen
             messages={messages}
             onSend={sendMessage}
             onNewChat={newChat}
             scrollRef={chatScrollRef}
           />
+        ) : (
+          <ClockScreen />
         )}
 
-        {/* The dots page between Pulse, Canvases, and Sage — full-frame pages
+        {/* The dots for Pulse, Canvases, Sage, Clock — full-frame pages
             (todo list, month view) are not among them, so the dots hide. */}
         {!todosOpen && !monthOpen && (
           <div style={S.dots}>
-            {[0, 1, 2].map((i) => (
+            {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
                 onClick={() => setScreen(i)}
