@@ -298,8 +298,8 @@ const SageMark = ({ size = 34 }) => (
   >
     <img
       src="/sage-mark.svg"
-      width={size * 0.65}
-      height={size * 0.65}
+      width={size * 0.5}
+      height={size * 0.5}
       alt=""
       style={{ display: 'block' }}
     />
