@@ -50,7 +50,7 @@ export default function SplashScreen({ onDone }) {
         fontFamily: 'monospace',
         zIndex: 2,
       }}>
-        SPLASH MOUNTED — video should follow
+        SPLASH MOUNTED (onEnded disabled)
       </div>
       <video
         ref={videoRef}
@@ -71,7 +71,6 @@ export default function SplashScreen({ onDone }) {
           // eslint-disable-next-line no-console
           console.log('[splash] video play');
         }}
-        onEnded={dismiss}
         onError={(e) => {
           // Log for debugging; do NOT auto-dismiss on error.
           // eslint-disable-next-line no-console
