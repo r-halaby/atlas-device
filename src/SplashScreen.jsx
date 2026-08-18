@@ -17,7 +17,7 @@ export default function SplashScreen({ onDone }) {
   // the kiosk never gets stuck on a black splash. Longer than the video's
   // real length (~4s) so a normal play never trips it.
   useEffect(() => {
-    const t = setTimeout(dismiss, 8000);
+    const t = setTimeout(dismiss, 15000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
