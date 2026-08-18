@@ -675,8 +675,14 @@ function PulseScreen({
   // The Today card reads off the centered day, so both panels stay in step.
   const centerIdx = calStart + CAL_CENTER;
   const centerDay = CAL_DAYS[centerIdx] ?? CAL_DAYS[0];
-  const month = centerDay.date.split(' ')[0];
   const health = DAY_HEALTH[centerDay.color];
+
+  // Header label: the range of days currently in the ribbon window. Single
+  // month for now (CAL_DAYS is one month) so both endpoints share a prefix.
+  const firstVisible = CAL_DAYS[calStart];
+  const lastVisible = CAL_DAYS[Math.min(calStart + CAL_WINDOW - 1, CAL_DAYS.length - 1)];
+  const monthAbbrev = MONTH_NAMES[CAL_MONTH_INDEX].slice(0, 3);
+  const rangeLabel = `${monthAbbrev} ${firstVisible.day} – ${lastVisible.day}`;
 
   return (
     <div style={S.pulse}>
@@ -776,9 +782,13 @@ function PulseScreen({
         <div style={{ ...S.card, ...S.calendarCard }}>
           <div style={S.calendarHeader}>
             <div style={S.monthNav}>
-              <IconChevron dir="left" size={11} />
-              <span style={S.monthName}>{month}</span>
-              <IconChevron dir="right" size={11} />
+              <div style={S.monthNavBtn} onClick={() => stepCal(-CAL_WINDOW)}>
+                <IconChevron dir="left" size={11} />
+              </div>
+              <span style={S.monthName}>{rangeLabel}</span>
+              <div style={S.monthNavBtn} onClick={() => stepCal(CAL_WINDOW)}>
+                <IconChevron dir="right" size={11} />
+              </div>
             </div>
             <div style={S.viewToggle}>
               <div style={S.viewToggleBtn} onClick={onOpenMonth}>
@@ -1691,10 +1701,11 @@ const S = {
     gap: 8,
   },
   monthName: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: 700,
     color: C.text,
-    letterSpacing: '-0.4px',
+    letterSpacing: '-0.3px',
+    whiteSpace: 'nowrap',
   },
   viewToggle: {
     display: 'flex',
