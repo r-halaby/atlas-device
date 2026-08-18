@@ -280,18 +280,30 @@ const IconSend = ({ size = 14 }) => (
 );
 
 // Sage's mark: a dotted cluster on a black disc.
+// Sage brand mark on a black disc. Yellow-on-white has too little contrast
+// on the chat page, so the disc gives the mark somewhere to sit. Mark is
+// ~65% of the disc — matches the composition of the original placeholder.
 const SageMark = ({ size = 34 }) => (
-  <svg width={size} height={size} viewBox="0 0 34 34">
-    <circle cx="17" cy="17" r="17" fill="#0a0a0a" />
-    {[
-      [12, 11], [17, 11], [22, 11],
-      [12, 15.5], [17, 15.5], [22, 15.5],
-      [12, 20], [17, 20], [22, 20],
-      [14.5, 24], [19.5, 24],
-    ].map(([x, y], i) => (
-      <circle key={i} cx={x} cy={y} r="1.5" fill="#3d3d3d" />
-    ))}
-  </svg>
+  <span
+    style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: '#0a0a0a',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src="/sage-mark.svg"
+      width={size * 0.5}
+      height={size * 0.5}
+      alt=""
+      style={{ display: 'block' }}
+    />
+  </span>
 );
 
 const IconGrid = ({ size = 12 }) => (
