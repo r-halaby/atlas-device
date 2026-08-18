@@ -1,0 +1,5 @@
+anthropic>=0.40.0
+openai>=1.50.0
+pyaudio>=0.2.14
+websockets>=13.0
+gpiozero>=2.0

@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { anyApi } from 'convex/server';
-import { MOCK_TODOS } from './mockTodos.js';
+import { MOCK_TODOS, MOCK_PROJECTS, MOCK_TIMER, MOCK_NOTES, MOCK_SAGE } from './mock/mockData.js';
+import { createMockSageAPI } from './mock/mockSageAPI.js';
+import { useSage } from './hooks/useSage.js';
 import SplashScreen from './SplashScreen.jsx';
+import SageOverlay from './components/SageOverlay.jsx';
 
 // Kiosk runs against Convex when a URL is configured; otherwise it renders
 // mock todos so design work keeps flowing while the backend catches up.
@@ -36,7 +39,12 @@ const useTodoData = USE_CONVEX ? useConvexTodos : useMockTodos;
 // -------------------- Mock data --------------------
 // The calendar holds a whole month; only CAL_WINDOW days sit on screen at once
 // and scrolling slides that window one day at a time.
+const CAL_YEAR = 2026;
+const CAL_MONTH_INDEX = 6; // July
+const CAL_DAYS_IN_MONTH = 31;
 const CAL_TODAY_DAY = 17;
+// Health is only known a week out; past that a day is grey rather than green.
+const CAL_HORIZON_DAY = CAL_TODAY_DAY + 6;
 const CAL_COLOR_CYCLE = ['green', 'yellow', 'green', 'green', 'yellow', 'red', 'green'];
 const CAL_COLOR_OVERRIDES = {
   14: 'yellow',
@@ -49,12 +57,15 @@ const CAL_COLOR_OVERRIDES = {
 };
 
 function buildCalendar() {
-  return Array.from({ length: 31 }, (_, i) => {
+  return Array.from({ length: CAL_DAYS_IN_MONTH }, (_, i) => {
     const day = i + 1;
     return {
+      day,
       date: `July ${day}`,
       color:
-        CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length],
+        day > CAL_HORIZON_DAY
+          ? 'grey'
+          : (CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length]),
       today: day === CAL_TODAY_DAY,
     };
   });
@@ -116,6 +127,12 @@ const DAY_HEALTH = {
     subtitle: 'Overcommitted — something has to give',
     projects: 'Blocked',
   },
+  grey: {
+    tone: 'unknown',
+    status: 'Not yet',
+    subtitle: 'Beyond the forecast — nothing logged for this day',
+    projects: '—',
+  },
 };
 
 const HEALTH_GRADIENTS = {
@@ -125,16 +142,40 @@ const HEALTH_GRADIENTS = {
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #fff2c4 55%, #ffe07a 85%, #fdd33b 105%)',
   critical:
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #ffd6cc 55%, #ff8f74 85%, #e52a05 105%)',
+  unknown:
+    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #f0f0ec 55%, #e0e0da 85%, #cbcbc3 105%)',
 };
+
+const C_GREY = '#cbcbc3';
 
 const BAR_COLORS = {
   green: { active: C.green, faded: '#a9e5c8' },
   yellow: { active: C.yellow, faded: '#fbe7a1' },
   red: { active: C.red, faded: '#f5a58f' },
+  grey: { active: C_GREY, faded: '#e2e2dc' },
 };
 
 const CAL_DAYS = mockData.pulse.calendar;
 const TODAY_IDX = CAL_DAYS.findIndex((d) => d.today);
+
+// Month grid runs Monday-first, so the 1st needs leading blanks to land under
+// its real weekday.
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const CAL_LEAD_BLANKS =
+  (new Date(CAL_YEAR, CAL_MONTH_INDEX, 1).getDay() + 6) % 7;
+
+// Three swipe pages: 0=Pulse, 1=Canvases, 2=Sage.
+const SCREEN_COUNT = 3;
+
+// Sage chat thread — canned replies since there's no live model behind the
+// swipe-page chat. The hardware-button Sage overlay (SageOverlay + useSage)
+// is a separate, real-model path; this is the ambient "type to Sage" UI.
+const SAGE_OPENING = [{ id: 0, from: 'sage', intro: true }];
+const SAGE_REPLIES = [
+  'Logged. I’ll track that against the project’s stated intent and flag drift as it appears.',
+  'Noted — I’ve tied that to the current canvas so the decision stays retrievable.',
+  'Classified as scope feedback. It’ll surface in the next digest for the team.',
+];
 
 // Design canvas stays 480; the frame is rendered onto a 720x720 panel via
 // CSS zoom, so all pixel constants below are in DESIGN space.
@@ -205,6 +246,45 @@ const IconPlus = ({ size = 12 }) => (
   </svg>
 );
 
+const IconX = ({ size = 12 }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
+    <path d="M3 3 L9 9 M9 3 L3 9" stroke={C.text} strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+);
+
+const IconMenu = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <path d="M2 4 H12 M2 7 H9 M2 10 H6" stroke={C.text} strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+);
+
+const IconSend = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <path
+      d="M12.2 1.8 L1.6 5.9 L6.1 7.9 L8.1 12.4 Z"
+      stroke={C.textMedium}
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </svg>
+);
+
+// Sage's mark: a dotted cluster on a black disc.
+const SageMark = ({ size = 34 }) => (
+  <svg width={size} height={size} viewBox="0 0 34 34">
+    <circle cx="17" cy="17" r="17" fill="#0a0a0a" />
+    {[
+      [12, 11], [17, 11], [22, 11],
+      [12, 15.5], [17, 15.5], [22, 15.5],
+      [12, 20], [17, 20], [22, 20],
+      [14.5, 24], [19.5, 24],
+    ].map(([x, y], i) => (
+      <circle key={i} cx={x} cy={y} r="1.5" fill="#3d3d3d" />
+    ))}
+  </svg>
+);
+
 const IconGrid = ({ size = 12 }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
     <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
@@ -230,21 +310,81 @@ const IconList = ({ size = 12 }) => (
 
 // -------------------- Component --------------------
 export default function App() {
-  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas
-  const { todos, toggleTodo } = useTodoData();
+  const [screen, setScreen] = useState(0); // 0=pulse, 1=canvas, 2=sage
+  const { todos: baseTodos, toggleTodo: baseToggle } = useTodoData();
   const [focusIdx, setFocusIdx] = useState(0);
-  // See All covers the whole frame with the full to-do list.
+  // See All covers the whole frame with the full to-do list; the calendar's
+  // grid toggle covers it with the month view.
   const [todosOpen, setTodosOpen] = useState(false);
+  const [monthOpen, setMonthOpen] = useState(false);
   const [todoFilter, setTodoFilter] = useState('all'); // all | open | done
   const [facets, setFacets] = useState({ canvas: ANY_CANVAS });
   // Index of the first day in the visible 7-day calendar window.
   const [calStart, setCalStart] = useState(() => clampCalStart(TODAY_IDX - CAL_CENTER));
   // Splash plays every load — on the Pi, "every load" == "every boot".
   const [splashDone, setSplashDone] = useState(false);
+  // Chat thread on the Sage swipe page.
+  const [messages, setMessages] = useState(SAGE_OPENING);
+
+  // Sage state lives here so mockSageAPI's setters and the display code can
+  // both reach it. Todos added by Sage go into their own bucket and are
+  // concatenated with the primary list, so Sage never touches the (possibly
+  // Convex-backed) primary state.
+  const [sageAddedTodos, setSageAddedTodos] = useState([]);
+  const [projects, setProjects] = useState(MOCK_PROJECTS);
+  const [timer, setTimer] = useState(MOCK_TIMER);
+  const [notes, setNotes] = useState(MOCK_NOTES);
+
+  const todos = useMemo(
+    () => [...baseTodos, ...sageAddedTodos],
+    [baseTodos, sageAddedTodos],
+  );
+
+  const toggleTodo = (todo) => {
+    if (!todo) return;
+    if (sageAddedTodos.some((t) => t.todoId === todo.todoId)) {
+      setSageAddedTodos((prev) =>
+        prev.map((t) => (t.todoId === todo.todoId ? { ...t, completed: !t.completed } : t)),
+      );
+    } else {
+      baseToggle(todo);
+    }
+  };
+
+  const sageAPI = useMemo(
+    () => createMockSageAPI({
+      setTodos: setSageAddedTodos,
+      setProjects,
+      setTimer,
+      setNotes,
+      setScreen,
+    }),
+    [],
+  );
+
+  const sage = useSage({
+    onConfirm: (action) => sageAPI.dispatch(action, projects),
+  });
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   const canvasScrollRef = useRef(null);
+  const chatScrollRef = useRef(null);
+
+  const sendMessage = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    setMessages((m) => [
+      ...m,
+      { id: m.length, from: 'user', text: t },
+      {
+        id: m.length + 1,
+        from: 'sage',
+        text: SAGE_REPLIES[m.filter((x) => x.from === 'user').length % SAGE_REPLIES.length],
+      },
+    ]);
+  };
+  const newChat = () => setMessages(SAGE_OPENING);
 
   const stepCal = (days) => setCalStart((s) => clampCalStart(s + days));
   const centerCal = (idx) => setCalStart(clampCalStart(idx - CAL_CENTER));
@@ -282,12 +422,14 @@ export default function App() {
     const dx = t.clientX - touchStartX.current;
     const dy = t.clientY - touchStartY.current;
     if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
-      // While the to-do page is up it owns the gesture: swipe back to leave,
-      // and don't let a swipe change the screen underneath it.
+      // While a full-frame page is up it owns the gesture: swipe back to
+      // leave, and don't let a swipe change the screen underneath it.
       if (todosOpen) {
         if (dx > 0) setTodosOpen(false);
-      } else if (dx < 0) setScreen(1);
-      else setScreen(0);
+      } else if (monthOpen) {
+        if (dx > 0) setMonthOpen(false);
+      } else if (dx < 0) setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
+      else setScreen((s) => Math.max(0, s - 1));
     }
     touchStartX.current = null;
     touchStartY.current = null;
@@ -295,6 +437,10 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      // Don't steal keys from the chat input — arrows would swipe pages and
+      // Enter would toggle a to-do instead of sending.
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (todosOpen) {
         if (e.key === 'Escape' || e.key === 'ArrowLeft') setTodosOpen(false);
         else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -308,15 +454,21 @@ export default function App() {
         }
         return;
       }
-      if (e.key === 'ArrowLeft') setScreen(0);
-      else if (e.key === 'ArrowRight') setScreen(1);
+      if (monthOpen) {
+        if (e.key === 'Escape' || e.key === 'ArrowLeft') setMonthOpen(false);
+        return;
+      }
+      if (e.key === 'ArrowLeft') setScreen((s) => Math.max(0, s - 1));
+      else if (e.key === 'ArrowRight')
+        setScreen((s) => Math.min(SCREEN_COUNT - 1, s + 1));
       else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const dir = e.key === 'ArrowUp' ? -1 : 1;
         if (screen === 0) {
           setFocusIdx((i) => Math.max(0, Math.min(todos.length - 1, i + dir)));
           stepCal(dir);
         } else {
-          canvasScrollRef.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
+          const ref = screen === 1 ? canvasScrollRef : chatScrollRef;
+          ref.current?.scrollBy({ top: dir * 120, behavior: 'smooth' });
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (screen === 0 && todos[focusIdx]) {
@@ -327,7 +479,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [screen, focusIdx, todos, todosOpen]);
+  }, [screen, focusIdx, todos, todosOpen, monthOpen, pageTodos.length]);
 
   return (
     <div style={S.root}>
@@ -337,6 +489,15 @@ export default function App() {
         onTouchEnd={onTouchEnd}
       >
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+        <SageOverlay
+          view={sage.view}
+          pendingAction={sage.pendingAction}
+          error={sage.error}
+          projects={projects}
+          onConfirm={sage.confirm}
+          onCancel={sage.cancel}
+          onChooseCandidate={sage.chooseAmbiguousOption}
+        />
         {todosOpen ? (
           <TodosScreen
             todos={pageTodos}
@@ -351,6 +512,14 @@ export default function App() {
             toggleTodo={toggleTodo}
             onBack={() => setTodosOpen(false)}
           />
+        ) : monthOpen ? (
+          <MonthScreen
+            onClose={() => setMonthOpen(false)}
+            onPickDay={(idx) => {
+              centerCal(idx);
+              setMonthOpen(false);
+            }}
+          />
         ) : screen === 0 ? (
           <PulseScreen
             todos={todos}
@@ -361,16 +530,24 @@ export default function App() {
             stepCal={stepCal}
             centerCal={centerCal}
             onSeeAll={() => setTodosOpen(true)}
+            onOpenMonth={() => setMonthOpen(true)}
           />
-        ) : (
+        ) : screen === 1 ? (
           <CanvasScreen scrollRef={canvasScrollRef} />
+        ) : (
+          <SageScreen
+            messages={messages}
+            onSend={sendMessage}
+            onNewChat={newChat}
+            scrollRef={chatScrollRef}
+          />
         )}
 
-        {/* The dots page between Pulse and Canvases — the to-do page is not
-            one of them, so it hides while that page is up. */}
-        {!todosOpen && (
+        {/* The dots page between Pulse, Canvases, and Sage — full-frame pages
+            (todo list, month view) are not among them, so the dots hide. */}
+        {!todosOpen && !monthOpen && (
           <div style={S.dots}>
-            {[0, 1].map((i) => (
+            {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 onClick={() => setScreen(i)}
@@ -398,6 +575,7 @@ function PulseScreen({
   stepCal,
   centerCal,
   onSeeAll,
+  onOpenMonth,
 }) {
   // Wheel and drag both accumulate distance and spend it a whole day at a time,
   // so the window never lands between days.
@@ -557,7 +735,7 @@ function PulseScreen({
               <IconChevron dir="right" size={11} />
             </div>
             <div style={S.viewToggle}>
-              <div style={S.viewToggleBtn}>
+              <div style={S.viewToggleBtn} onClick={onOpenMonth}>
                 <IconGrid size={11} />
               </div>
               <div style={{ ...S.viewToggleBtn, background: '#ffffff' }}>
@@ -801,6 +979,161 @@ function TodosScreen({
           <li style={S.todosEmpty}>No to-dos match these filters — {total} in all</li>
         )}
       </ul>
+    </div>
+  );
+}
+
+// -------------------- Month page --------------------
+// Behind the calendar card's grid toggle. Monday-first month grid, one circle
+// per day coloured by that day's health. Days past the horizon are grey.
+function MonthScreen({ onClose, onPickDay }) {
+  const cells = [
+    ...Array.from({ length: CAL_LEAD_BLANKS }, (_, i) => ({ blank: true, key: `b${i}` })),
+    ...CAL_DAYS.map((d, idx) => ({ d, idx, key: d.date })),
+  ];
+
+  return (
+    <div style={S.monthPage}>
+      <div style={S.monthHeader}>
+        <div style={S.monthNav}>
+          <IconChevron dir="left" size={12} />
+          <span style={S.monthNameBig}>{CAL_DAYS[0].date.split(' ')[0]}</span>
+          <IconChevron dir="right" size={12} />
+        </div>
+        <div style={S.closeBtn} onClick={onClose}>
+          <IconX size={11} />
+        </div>
+      </div>
+
+      <div style={S.weekHead}>
+        {WEEKDAYS.map((w) => (
+          <div key={w} style={S.weekHeadCell}>{w}</div>
+        ))}
+      </div>
+
+      <div style={S.monthGrid}>
+        {cells.map((c) =>
+          c.blank ? (
+            <div key={c.key} style={S.dayBlank} />
+          ) : (
+            <div
+              key={c.key}
+              style={{
+                ...S.dayCell,
+                background: BAR_COLORS[c.d.color].active,
+                boxShadow: c.d.today ? `0 0 0 2px ${C.text}` : 'none',
+              }}
+              onClick={() => onPickDay(c.idx)}
+            >{c.d.day}</div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------- Sage chat screen --------------------
+// The swipe-page Sage: type or dictate, canned replies. The hardware-button
+// Sage overlay (SageOverlay + useSage) is a separate flow — this is the
+// ambient in-app chat, that is a Real Model when Atlas Sage endpoints ship.
+function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
+  const [draft, setDraft] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const sage = MOCK_SAGE;
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, scrollRef]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    onSend(draft);
+    setDraft('');
+  };
+
+  return (
+    <div style={S.sagePage}>
+      <div style={S.sageHeader}>
+        <div style={S.sageIconBtn} onClick={() => setHistoryOpen(true)}>
+          <IconMenu size={14} />
+        </div>
+        <SageMark size={34} />
+        <div style={S.sageTitleBlock}>
+          <div style={S.sageName}>Sage</div>
+          <div style={S.sageTagline}>{sage.tagline}</div>
+        </div>
+        <div style={S.sageIconBtn} onClick={onNewChat}>
+          <IconPlus size={13} />
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="kiosk-scroll" style={S.sageThread}>
+        {messages.map((m) =>
+          m.from === 'user' ? (
+            <div key={m.id} style={S.userRow}>
+              <div style={S.userBubble}>{m.text}</div>
+            </div>
+          ) : (
+            <div key={m.id} style={S.sageRow}>
+              <SageMark size={22} />
+              <div style={S.sageBubble}>
+                {m.intro ? (
+                  <>
+                    <div style={S.sageLead}>{sage.intro.lead}</div>
+                    <div style={S.sageListLead}>{sage.intro.listLead}</div>
+                    {sage.intro.bullets.map((b) => (
+                      <div key={b} style={S.sageBullet}>
+                        <span style={S.sageDot} />
+                        <span>{b}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  m.text
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+
+      <form style={S.composer} onSubmit={submit}>
+        <input
+          style={S.composerInput}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Ask Sage anything..."
+        />
+        <button type="submit" style={S.sendBtn}>
+          <IconSend size={14} />
+        </button>
+      </form>
+
+      {historyOpen && (
+        <>
+          <div style={S.historyScrim} onClick={() => setHistoryOpen(false)} />
+          <div style={S.historyPanel}>
+            <div style={S.historyHead}>
+              <span style={S.historyTitle}>Chat History</span>
+              <span
+                style={S.historyNew}
+                onClick={() => { onNewChat(); setHistoryOpen(false); }}
+              >+ New</span>
+            </div>
+            {sage.history.map((h) => (
+              <div
+                key={h.id}
+                style={S.historyItem}
+                onClick={() => setHistoryOpen(false)}
+              >
+                <div style={S.historyItemTitle}>{h.title}</div>
+                <div style={S.historyItemDate}>{h.date}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1402,5 +1735,264 @@ const S = {
     borderRadius: 3,
     cursor: 'pointer',
     transition: 'width 200ms ease, background 200ms ease',
+  },
+
+  // ---- Sage chat page ----
+  sagePage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    paddingBottom: 24,
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  sageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+    flexShrink: 0,
+  },
+  sageIconBtn: {
+    width: 22,
+    height: 22,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  sageTitleBlock: { flex: 1, minWidth: 0 },
+  sageName: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.3px',
+    lineHeight: 1.15,
+  },
+  sageTagline: {
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
+    lineHeight: 1.2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  sageThread: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
+    padding: '12px 0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  sageRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    flexShrink: 0,
+  },
+  sageBubble: {
+    flex: 1,
+    minWidth: 0,
+    background: '#ededed',
+    borderRadius: 12,
+    padding: '10px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.45,
+    color: C.textMedium,
+  },
+  sageLead: { marginBottom: 8 },
+  sageListLead: { marginBottom: 5 },
+  sageBullet: {
+    display: 'flex',
+    gap: 7,
+    paddingLeft: 2,
+    marginBottom: 4,
+  },
+  sageDot: {
+    width: 3,
+    height: 3,
+    borderRadius: '50%',
+    background: '#b4b4b4',
+    flexShrink: 0,
+    marginTop: 6,
+  },
+  userRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
+  },
+  userBubble: {
+    maxWidth: '78%',
+    background: C.text,
+    color: '#ffffff',
+    borderRadius: 12,
+    padding: '9px 11px',
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.4,
+  },
+  composer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#ededed',
+    borderRadius: 12,
+    padding: '6px 6px 6px 12px',
+    flexShrink: 0,
+  },
+  composerInput: {
+    flex: 1,
+    minWidth: 0,
+    border: 'none',
+    outline: 'none',
+    background: 'transparent',
+    fontSize: 11.5,
+    fontWeight: 500,
+    color: C.text,
+    fontFamily: 'inherit',
+  },
+  sendBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    background: '#e0e0e0',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+    padding: 0,
+  },
+  historyScrim: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0,0,0,0.18)',
+    zIndex: 8,
+  },
+  historyPanel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 210,
+    zIndex: 9,
+    background: C.card,
+    borderRight: `1px solid ${C.border}`,
+    padding: 14,
+    overflowY: 'auto',
+  },
+  historyHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottom: `1px solid ${C.border}`,
+  },
+  historyTitle: { fontSize: 12, fontWeight: 500, color: C.textMuted },
+  historyNew: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: C.text,
+    cursor: 'pointer',
+  },
+  historyItem: {
+    padding: '10px 0',
+    borderBottom: '1px solid #f0f0f0',
+    cursor: 'pointer',
+  },
+  historyItemTitle: {
+    fontSize: 11,
+    fontWeight: 500,
+    color: C.text,
+    lineHeight: 1.25,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  historyItemDate: {
+    marginTop: 3,
+    fontSize: 9.5,
+    fontWeight: 500,
+    color: C.textMuted,
+  },
+
+  // ---- Month page ----
+  monthPage: {
+    width: '100%',
+    height: '100%',
+    padding: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    background: C.bg,
+  },
+  monthHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  monthNameBig: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: C.text,
+    letterSpacing: '-0.5px',
+    lineHeight: 1.1,
+  },
+  closeBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  weekHead: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 8,
+    margin: '18px 0 8px',
+    flexShrink: 0,
+  },
+  weekHeadCell: {
+    textAlign: 'center',
+    fontSize: 9.5,
+    fontWeight: 600,
+    letterSpacing: '0.7px',
+    color: '#c2c2c2',
+  },
+  monthGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 8,
+    alignContent: 'start',
+  },
+  dayBlank: {
+    aspectRatio: '1 / 1',
+  },
+  dayCell: {
+    aspectRatio: '1 / 1',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 13,
+    fontWeight: 600,
+    color: C.text,
+    cursor: 'pointer',
   },
 };
