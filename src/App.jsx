@@ -545,49 +545,72 @@ export default function App() {
           onCancel={sage.cancel}
           onChooseCandidate={sage.chooseAmbiguousOption}
         />
-        {todosOpen ? (
-          <TodosScreen
-            todos={pageTodos}
-            total={todos.length}
-            filter={todoFilter}
-            setFilter={changeFilter}
-            facets={facets}
-            facetOptions={facetOptions}
-            setFacet={setFacet}
-            focusIdx={focusIdx}
-            setFocusIdx={setFocusIdx}
-            toggleTodo={toggleTodo}
-            onBack={() => setTodosOpen(false)}
-          />
-        ) : monthOpen ? (
-          <MonthScreen
-            onClose={() => setMonthOpen(false)}
-            onPickDay={(idx) => {
-              centerCal(idx);
-              setMonthOpen(false);
-            }}
-          />
-        ) : screen === SCREEN_CLOCK ? (
-          <ClockScreen />
-        ) : screen === SCREEN_PULSE ? (
-          <PulseScreen
-            todos={todos}
-            focusIdx={focusIdx}
-            calStart={calStart}
-            stepCal={stepCal}
-            centerCal={centerCal}
-            onSeeAll={() => setTodosOpen(true)}
-            onOpenMonth={() => setMonthOpen(true)}
-          />
-        ) : screen === SCREEN_CANVAS ? (
-          <CanvasScreen scrollRef={canvasScrollRef} />
-        ) : (
-          <SageScreen
-            messages={messages}
-            onSend={sendMessage}
-            onNewChat={newChat}
-            scrollRef={chatScrollRef}
-          />
+        {/* Main swipe screens stay permanently mounted; only the active one
+            has display:block. Unmount/remount was leaving Chromium's
+            Ozone-Wayland compositor with stale paint under the new screen. */}
+        {(() => {
+          const showMain = !todosOpen && !monthOpen;
+          const box = (visible) => ({ position: 'absolute', inset: 0, display: visible ? 'flex' : 'none' });
+          return (
+            <>
+              <div style={box(showMain && screen === SCREEN_CLOCK)}>
+                <ClockScreen />
+              </div>
+              <div style={box(showMain && screen === SCREEN_PULSE)}>
+                <PulseScreen
+                  todos={todos}
+                  focusIdx={focusIdx}
+                  calStart={calStart}
+                  stepCal={stepCal}
+                  centerCal={centerCal}
+                  onSeeAll={() => setTodosOpen(true)}
+                  onOpenMonth={() => setMonthOpen(true)}
+                />
+              </div>
+              <div style={box(showMain && screen === SCREEN_CANVAS)}>
+                <CanvasScreen scrollRef={canvasScrollRef} />
+              </div>
+              <div style={box(showMain && screen === SCREEN_SAGE)}>
+                <SageScreen
+                  messages={messages}
+                  onSend={sendMessage}
+                  onNewChat={newChat}
+                  scrollRef={chatScrollRef}
+                />
+              </div>
+            </>
+          );
+        })()}
+
+        {/* Modals — mount/unmount as before so their internal state resets.
+            zIndex 50 sits above the mains but below SageOverlay/Splash. */}
+        {todosOpen && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex' }}>
+            <TodosScreen
+              todos={pageTodos}
+              total={todos.length}
+              filter={todoFilter}
+              setFilter={changeFilter}
+              facets={facets}
+              facetOptions={facetOptions}
+              setFacet={setFacet}
+              focusIdx={focusIdx}
+              setFocusIdx={setFocusIdx}
+              toggleTodo={toggleTodo}
+              onBack={() => setTodosOpen(false)}
+            />
+          </div>
+        )}
+        {monthOpen && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex' }}>
+            <MonthScreen
+              onClose={() => setMonthOpen(false)}
+              onPickDay={(idx) => {
+                centerCal(idx);
+                setMonthOpen(false);
+              }}
+            />
+          </div>
         )}
 
         {/* The dots for Pulse, Canvases, Sage, Clock — full-frame pages
