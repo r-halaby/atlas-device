@@ -482,9 +482,9 @@ export default function App() {
         }
         // Clock has nothing to scroll.
       } else if (e.key === 'Enter' || e.key === ' ') {
-        if (screen === SCREEN_PULSE && todos[focusIdx]) {
+        if (screen === SCREEN_PULSE) {
           e.preventDefault();
-          toggleTodo(todos[focusIdx]);
+          setTodosOpen(true);
         }
       }
     };
@@ -537,8 +537,6 @@ export default function App() {
           <PulseScreen
             todos={todos}
             focusIdx={focusIdx}
-            setFocusIdx={setFocusIdx}
-            toggleTodo={toggleTodo}
             calStart={calStart}
             stepCal={stepCal}
             centerCal={centerCal}
@@ -582,8 +580,6 @@ export default function App() {
 function PulseScreen({
   todos,
   focusIdx,
-  setFocusIdx,
-  toggleTodo,
   calStart,
   stepCal,
   centerCal,
@@ -671,8 +667,12 @@ function PulseScreen({
             </div>
           </div>
 
-          {/* To-Dos card */}
-          <div style={{ ...S.card, ...S.todosCard }}>
+          {/* To-Dos card — the whole card taps into the full list; items on
+              the ribbon are a read-only preview. */}
+          <div
+            style={{ ...S.card, ...S.todosCard, cursor: 'pointer' }}
+            onClick={onSeeAll}
+          >
             <div style={S.todosHeader}>
               <div style={S.cardTitle}>To-Dos</div>
               <div style={S.iconBtn}>
@@ -690,10 +690,6 @@ function PulseScreen({
                       background: focused
                         ? 'rgba(0,0,0,0.03)'
                         : 'transparent',
-                    }}
-                    onClick={() => {
-                      setFocusIdx(i);
-                      toggleTodo(t);
                     }}
                   >
                     <span
@@ -733,9 +729,6 @@ function PulseScreen({
                 );
               })}
             </ul>
-            <div style={S.seeAll} onClick={onSeeAll}>
-              See All
-            </div>
           </div>
         </div>
 
@@ -1390,13 +1383,6 @@ const S = {
     fontSize: 12.5,
     fontWeight: 500,
     lineHeight: 1.2,
-  },
-  seeAll: {
-    marginTop: 6,
-    fontSize: 11,
-    color: C.textMuted,
-    fontWeight: 500,
-    cursor: 'pointer',
   },
 
   // ---- To-Dos page ----
