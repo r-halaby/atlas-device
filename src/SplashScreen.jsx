@@ -1,8 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // Boot-time intro that plays over the frame and unmounts when the video ends.
-// Also dismissable by tap — Chromium on the Pi will autoplay muted, but the
-// user can skip if they've seen it enough.
+// Also dismissable by tap. Autoplay is muted so Chromium doesn't block it.
 export default function SplashScreen({ onDone }) {
   const videoRef = useRef(null);
   const [fading, setFading] = useState(false);
@@ -13,6 +12,15 @@ export default function SplashScreen({ onDone }) {
     // Fade duration matches the CSS transition below.
     setTimeout(onDone, 320);
   };
+
+  // Hard timeout: if the video hasn't ended in this long, dismiss anyway so
+  // the kiosk never gets stuck on a black splash. Longer than the video's
+  // real length; if we hit this, something (codec, autoplay, network) failed.
+  useEffect(() => {
+    const t = setTimeout(dismiss, 8000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -38,9 +46,14 @@ export default function SplashScreen({ onDone }) {
         playsInline
         preload="auto"
         onEnded={dismiss}
-        // If autoplay is blocked for any reason, don't leave a black screen up
-        // forever — dismiss after a hard timeout.
-        onError={dismiss}
+        onError={(e) => {
+          // Log for debugging; do NOT auto-dismiss on error. If we did, a
+          // codec issue would make the splash flash and disappear in a
+          // single frame — much worse UX than a plain black screen for the
+          // ~8s fallback timeout above.
+          // eslint-disable-next-line no-console
+          console.error('[splash] video error', e?.target?.error);
+        }}
         style={{
           width: '100%',
           height: '100%',
