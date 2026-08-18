@@ -436,16 +436,17 @@ export default function App() {
     return true;
   });
 
-  const onTouchStart = (e) => {
-    const t = e.touches[0];
-    touchStartX.current = t.clientX;
-    touchStartY.current = t.clientY;
+  // Pointer events unify touch, mouse, and pen so this works no matter how
+  // Chromium is delivering input. TouchEvents specifically weren't firing
+  // reliably under Ozone-Wayland on Bookworm.
+  const onPointerDown = (e) => {
+    touchStartX.current = e.clientX;
+    touchStartY.current = e.clientY;
   };
-  const onTouchEnd = (e) => {
+  const onPointerUp = (e) => {
     if (touchStartX.current == null) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStartX.current;
-    const dy = t.clientY - touchStartY.current;
+    const dx = e.clientX - touchStartX.current;
+    const dy = e.clientY - touchStartY.current;
     if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
       // While a full-frame page is up it owns the gesture: swipe back to
       // leave, and don't let a swipe change the screen underneath it.
@@ -512,8 +513,8 @@ export default function App() {
     <div style={S.root}>
       <div
         style={S.frame}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
       >
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <SageOverlay
@@ -618,14 +619,17 @@ function PulseScreen({
     }
   };
 
-  const onCalTouchStart = (e) => {
-    dragFrom.current = e.touches[0].clientY;
-    dragOrigin.current = e.touches[0].clientY;
+  const onCalPointerDown = (e) => {
+    dragFrom.current = e.clientY;
+    dragOrigin.current = e.clientY;
     dragged.current = false;
+    // Capture the pointer so we keep getting moves even if the finger drifts
+    // outside the calendar column mid-drag.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
-  const onCalTouchMove = (e) => {
+  const onCalPointerMove = (e) => {
     if (dragFrom.current == null) return;
-    const y = e.touches[0].clientY;
+    const y = e.clientY;
     if (Math.abs(dragOrigin.current - y) > 6 * SCALE) dragged.current = true;
     const dy = dragFrom.current - y; // drag up → later days
     const days = Math.trunc(dy / CAL_DRAG_STEP_VIEWPORT);
@@ -634,8 +638,9 @@ function PulseScreen({
       stepCal(days);
     }
   };
-  const onCalTouchEnd = () => {
+  const onCalPointerUp = (e) => {
     dragFrom.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
   };
 
   // Tapping a day brings it to the center — but a drag ends in a click too, so
@@ -769,9 +774,10 @@ function PulseScreen({
           <div
             style={S.calendarBody}
             onWheel={onWheel}
-            onTouchStart={onCalTouchStart}
-            onTouchMove={onCalTouchMove}
-            onTouchEnd={onCalTouchEnd}
+            onPointerDown={onCalPointerDown}
+            onPointerMove={onCalPointerMove}
+            onPointerUp={onCalPointerUp}
+            onPointerCancel={onCalPointerUp}
           >
             <div style={S.calViewport}>
               {/* Every day is rendered once, in fixed DOM order — only the
