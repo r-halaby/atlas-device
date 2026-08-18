@@ -38,6 +38,20 @@ export default function SplashScreen({ onDone }) {
         cursor: 'pointer',
       }}
     >
+      {/* TEMP DIAGNOSTIC: visible marker so we can tell whether the splash
+          component is mounting at all vs. whether the video is failing. */}
+      <div style={{
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        right: 20,
+        color: '#fff',
+        fontSize: 14,
+        fontFamily: 'monospace',
+        zIndex: 2,
+      }}>
+        SPLASH MOUNTED — video should follow
+      </div>
       <video
         ref={videoRef}
         src="/splash.mp4"
@@ -45,12 +59,21 @@ export default function SplashScreen({ onDone }) {
         muted
         playsInline
         preload="auto"
+        onLoadedData={() => {
+          // eslint-disable-next-line no-console
+          console.log('[splash] video loaded');
+        }}
+        onCanPlay={() => {
+          // eslint-disable-next-line no-console
+          console.log('[splash] video canPlay');
+        }}
+        onPlay={() => {
+          // eslint-disable-next-line no-console
+          console.log('[splash] video play');
+        }}
         onEnded={dismiss}
         onError={(e) => {
-          // Log for debugging; do NOT auto-dismiss on error. If we did, a
-          // codec issue would make the splash flash and disappear in a
-          // single frame — much worse UX than a plain black screen for the
-          // ~8s fallback timeout above.
+          // Log for debugging; do NOT auto-dismiss on error.
           // eslint-disable-next-line no-console
           console.error('[splash] video error', e?.target?.error);
         }}
