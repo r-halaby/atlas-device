@@ -70,8 +70,14 @@ export default function ClockScreen() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      isolation: 'isolate',
+      contain: 'paint',
     }}>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width="100%" height="100%">
+        {/* Explicit opaque fill inside the SVG in case Chromium's Wayland
+            compositor doesn't paint the parent div's background under the
+            SVG cleanly on layer swap. */}
+        <rect width={SIZE} height={SIZE} fill={FACE} />
         {ticks}
 
         {NUMERALS.map(({ n, angle }) => {
