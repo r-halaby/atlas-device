@@ -57,19 +57,38 @@ const CAL_COLOR_OVERRIDES = {
   20: 'red',
 };
 
-function buildCalendar() {
-  return Array.from({ length: CAL_DAYS_IN_MONTH }, (_, i) => {
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// Parametric — used by both the Pulse ribbon calendar (locked to the "today"
+// month) and MonthScreen when the user navigates to adjacent months.
+function buildMonth(year, monthIndex) {
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const isCurrentMonth = year === CAL_YEAR && monthIndex === CAL_MONTH_INDEX;
+  return Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1;
+    // Adjacent months are entirely beyond the forecast horizon (in either
+    // direction), so the whole month reads as grey — same "unknown" state
+    // as far-future days in the current month.
+    const color = !isCurrentMonth
+      ? 'grey'
+      : day > CAL_HORIZON_DAY
+        ? 'grey'
+        : (CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length]);
     return {
       day,
-      date: `July ${day}`,
-      color:
-        day > CAL_HORIZON_DAY
-          ? 'grey'
-          : (CAL_COLOR_OVERRIDES[day] ?? CAL_COLOR_CYCLE[i % CAL_COLOR_CYCLE.length]),
-      today: day === CAL_TODAY_DAY,
+      date: `${MONTH_NAMES[monthIndex]} ${day}`,
+      color,
+      today: isCurrentMonth && day === CAL_TODAY_DAY,
     };
   });
+}
+
+// Kept for the Pulse ribbon calendar, which is anchored to the current month.
+function buildCalendar() {
+  return buildMonth(CAL_YEAR, CAL_MONTH_INDEX);
 }
 
 const mockData = {
@@ -1013,20 +1032,62 @@ function TodosScreen({
 
 // -------------------- Month page --------------------
 // Behind the calendar card's grid toggle. Monday-first month grid, one circle
-// per day coloured by that day's health. Days past the horizon are grey.
+// per day coloured by that day's health. Chevrons and left/right swipes step
+// months; days past the horizon are grey.
 function MonthScreen({ onClose, onPickDay }) {
+  // Local navigation state — Pulse's calendar column stays anchored to the
+  // current month regardless of what the user browses here.
+  const [{ year, month }, setYM] = useState({ year: CAL_YEAR, month: CAL_MONTH_INDEX });
+  const isCurrentMonth = year === CAL_YEAR && month === CAL_MONTH_INDEX;
+
+  const days = buildMonth(year, month);
+  const leadBlanks = (new Date(year, month, 1).getDay() + 6) % 7;
   const cells = [
-    ...Array.from({ length: CAL_LEAD_BLANKS }, (_, i) => ({ blank: true, key: `b${i}` })),
-    ...CAL_DAYS.map((d, idx) => ({ d, idx, key: d.date })),
+    ...Array.from({ length: leadBlanks }, (_, i) => ({ blank: true, key: `b${i}` })),
+    ...days.map((d, idx) => ({ d, idx, key: d.date })),
   ];
 
+  const stepMonth = (dir) => {
+    setYM((prev) => {
+      const d = new Date(prev.year, prev.month + dir, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  };
+
+  // Own the horizontal swipe here — stop it bubbling to the frame so the frame
+  // doesn't treat swipe-right as "close month view."
+  const swipeStart = useRef(null);
+  const onPointerDown = (e) => {
+    e.stopPropagation();
+    swipeStart.current = { x: e.clientX, y: e.clientY };
+  };
+  const onPointerUp = (e) => {
+    e.stopPropagation();
+    if (!swipeStart.current) return;
+    const dx = e.clientX - swipeStart.current.x;
+    const dy = e.clientY - swipeStart.current.y;
+    swipeStart.current = null;
+    if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      stepMonth(dx < 0 ? 1 : -1);
+    }
+  };
+
   return (
-    <div style={S.monthPage}>
+    <div
+      style={S.monthPage}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
       <div style={S.monthHeader}>
         <div style={S.monthNav}>
-          <IconChevron dir="left" size={12} />
-          <span style={S.monthNameBig}>{CAL_DAYS[0].date.split(' ')[0]}</span>
-          <IconChevron dir="right" size={12} />
+          <div style={S.monthNavBtn} onClick={() => stepMonth(-1)}>
+            <IconChevron dir="left" size={12} />
+          </div>
+          <span style={S.monthNameBig}>{MONTH_NAMES[month]}</span>
+          <div style={S.monthNavBtn} onClick={() => stepMonth(1)}>
+            <IconChevron dir="right" size={12} />
+          </div>
         </div>
         <div style={S.closeBtn} onClick={onClose}>
           <IconX size={11} />
@@ -1050,8 +1111,11 @@ function MonthScreen({ onClose, onPickDay }) {
                 ...S.dayCell,
                 background: BAR_COLORS[c.d.color].active,
                 boxShadow: c.d.today ? `0 0 0 2px ${C.text}` : 'none',
+                cursor: isCurrentMonth ? 'pointer' : 'default',
               }}
-              onClick={() => onPickDay(c.idx)}
+              // Only centre the Pulse ribbon on days from the current month —
+              // adjacent-month days don't correspond to anything in the ribbon.
+              onClick={() => { if (isCurrentMonth) onPickDay(c.idx); }}
             >{c.d.day}</div>
           )
         )}
@@ -1701,6 +1765,7 @@ const S = {
     paddingBottom: 24,
     display: 'flex',
     flexDirection: 'column',
+    background: C.bg,
   },
   canvasScroll: {
     flex: 1,
@@ -1774,6 +1839,7 @@ const S = {
     flexDirection: 'column',
     position: 'relative',
     overflow: 'hidden',
+    background: C.bg,
   },
   sageHeader: {
     display: 'flex',
@@ -1976,6 +2042,14 @@ const S = {
     color: C.text,
     letterSpacing: '-0.5px',
     lineHeight: 1.1,
+  },
+  monthNavBtn: {
+    width: 26,
+    height: 26,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   closeBtn: {
     width: 26,
