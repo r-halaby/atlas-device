@@ -1,57 +1,43 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-// Boot-time intro that plays over the frame and unmounts when the video ends.
-// Also dismissable by tap. Autoplay is muted so Chromium doesn't block it.
+// TEMP DIAGNOSTIC BUILD — all dismiss paths disabled. Splash stays up and
+// prints a live event log so we can see what fires on the Pi's Chromium.
 export default function SplashScreen({ onDone }) {
   const videoRef = useRef(null);
-  const [fading, setFading] = useState(false);
+  const [log, setLog] = useState([`0.00s mount`]);
+  const t0 = useRef(performance.now());
 
-  const dismiss = () => {
-    if (fading) return;
-    setFading(true);
-    // Fade duration matches the CSS transition below.
-    setTimeout(onDone, 320);
+  const push = (msg) => {
+    const t = ((performance.now() - t0.current) / 1000).toFixed(2);
+    setLog((l) => [...l, `${t}s ${msg}`]);
   };
 
-  // Hard timeout: if the video hasn't ended in this long, dismiss anyway so
-  // the kiosk never gets stuck on a black splash. Longer than the video's
-  // real length; if we hit this, something (codec, autoplay, network) failed.
   useEffect(() => {
-    const t = setTimeout(dismiss, 8000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    push('effect');
+    // DO NOT dismiss automatically — this build is diagnostic.
+    // Tap the splash to force dismiss when done reading.
   }, []);
 
   return (
     <div
-      onClick={dismiss}
+      onClick={() => {
+        push('CLICK');
+        setTimeout(onDone, 400);
+      }}
       style={{
         position: 'absolute',
         inset: 0,
         background: '#000',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        color: '#fff',
+        fontFamily: 'monospace',
+        fontSize: 13,
+        padding: 12,
         zIndex: 100,
-        opacity: fading ? 0 : 1,
-        transition: 'opacity 320ms ease',
+        overflow: 'auto',
         cursor: 'pointer',
       }}
     >
-      {/* TEMP DIAGNOSTIC: visible marker so we can tell whether the splash
-          component is mounting at all vs. whether the video is failing. */}
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        left: 20,
-        right: 20,
-        color: '#fff',
-        fontSize: 14,
-        fontFamily: 'monospace',
-        zIndex: 2,
-      }}>
-        SPLASH MOUNTED (onEnded disabled)
-      </div>
+      <div style={{ marginBottom: 8 }}>SPLASH (diag) — tap to close</div>
       <video
         ref={videoRef}
         src="/splash.mp4"
@@ -59,29 +45,27 @@ export default function SplashScreen({ onDone }) {
         muted
         playsInline
         preload="auto"
-        onLoadedData={() => {
-          // eslint-disable-next-line no-console
-          console.log('[splash] video loaded');
-        }}
-        onCanPlay={() => {
-          // eslint-disable-next-line no-console
-          console.log('[splash] video canPlay');
-        }}
-        onPlay={() => {
-          // eslint-disable-next-line no-console
-          console.log('[splash] video play');
-        }}
-        onError={(e) => {
-          // Log for debugging; do NOT auto-dismiss on error.
-          // eslint-disable-next-line no-console
-          console.error('[splash] video error', e?.target?.error);
-        }}
+        onLoadStart={() => push('loadstart')}
+        onLoadedMetadata={(e) => push(`meta d=${e.target.duration.toFixed(2)}`)}
+        onLoadedData={() => push('loadeddata')}
+        onCanPlay={() => push('canplay')}
+        onPlay={() => push('play')}
+        onPlaying={() => push('playing')}
+        onEnded={() => push('ENDED')}
+        onError={(e) => push(`ERROR code=${e.target.error?.code} msg=${e.target.error?.message ?? ''}`)}
+        onStalled={() => push('stalled')}
+        onSuspend={() => push('suspend')}
+        onAbort={() => push('abort')}
         style={{
           width: '100%',
-          height: '100%',
-          objectFit: 'cover',
+          height: 100,
+          background: '#333',
+          marginBottom: 8,
         }}
       />
+      {log.map((line, i) => (
+        <div key={i}>{line}</div>
+      ))}
     </div>
   );
 }
