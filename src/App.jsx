@@ -201,8 +201,12 @@ const CAL_ROW_PITCH = 48; // row height + gap — converts drag distance into da
 // clientX/clientY from touch events are in VIEWPORT pixels, not design pixels.
 // Interaction thresholds that compare against those deltas must be scaled up
 // so a "one row drag" and a "swipe" feel the same on the 720 panel as on 480.
-const SWIPE_THRESHOLD = 45 * SCALE;
+const SWIPE_THRESHOLD = 30 * SCALE;
 const CAL_ROW_PITCH_VIEWPORT = CAL_ROW_PITCH * SCALE;
+// How much viewport-pixel drag/wheel advances one day. Kept softer than
+// the layout row pitch so a comfortable thumb flick spans several days
+// without needing to sweep the whole column.
+const CAL_DRAG_STEP_VIEWPORT = 32 * SCALE;
 
 const clampCalStart = (i) => Math.max(0, Math.min(CAL_MAX_START, i));
 
@@ -607,9 +611,9 @@ function PulseScreen({
 
   const onWheel = (e) => {
     wheelAcc.current += e.deltaY;
-    const days = Math.trunc(wheelAcc.current / CAL_ROW_PITCH_VIEWPORT);
+    const days = Math.trunc(wheelAcc.current / CAL_DRAG_STEP_VIEWPORT);
     if (days) {
-      wheelAcc.current -= days * CAL_ROW_PITCH_VIEWPORT;
+      wheelAcc.current -= days * CAL_DRAG_STEP_VIEWPORT;
       stepCal(days);
     }
   };
@@ -624,9 +628,9 @@ function PulseScreen({
     const y = e.touches[0].clientY;
     if (Math.abs(dragOrigin.current - y) > 6 * SCALE) dragged.current = true;
     const dy = dragFrom.current - y; // drag up → later days
-    const days = Math.trunc(dy / CAL_ROW_PITCH_VIEWPORT);
+    const days = Math.trunc(dy / CAL_DRAG_STEP_VIEWPORT);
     if (days) {
-      dragFrom.current -= days * CAL_ROW_PITCH_VIEWPORT;
+      dragFrom.current -= days * CAL_DRAG_STEP_VIEWPORT;
       stepCal(days);
     }
   };
@@ -1243,6 +1247,9 @@ const S = {
     overflow: 'hidden',
     userSelect: 'none',
     WebkitUserSelect: 'none',
+    // manipulation removes the 300ms double-tap zoom wait so single taps
+    // register instantly. Child scrollables override with pan-y as needed.
+    touchAction: 'manipulation',
   },
 
   pageLabel: {
@@ -1545,6 +1552,7 @@ const S = {
     overflowY: 'auto',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
+    touchAction: 'pan-y',
   },
   todoRow: {
     display: 'flex',
@@ -1693,6 +1701,8 @@ const S = {
     overflowY: 'auto',
     overflowX: 'hidden',
     paddingRight: 2,
+    WebkitOverflowScrolling: 'touch',
+    touchAction: 'pan-y',
   },
   grid: {
     display: 'grid',
@@ -1799,6 +1809,7 @@ const S = {
     overflowY: 'auto',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
+    touchAction: 'pan-y',
     padding: '12px 0',
     display: 'flex',
     flexDirection: 'column',
