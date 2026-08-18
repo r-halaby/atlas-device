@@ -1348,6 +1348,12 @@ const S = {
     paddingBottom: 24,
     display: 'flex',
     flexDirection: 'column',
+    // Opaque background + isolation so the browser can't reuse pixels from
+    // this layer under a sibling screen. On Ozone-Wayland with the frame's
+    // CSS zoom, we were seeing Pulse pixels persist under Clock/Canvas etc.
+    background: C.bg,
+    isolation: 'isolate',
+    contain: 'paint',
   },
   pulseCols: {
     flex: 1,
@@ -1494,6 +1500,8 @@ const S = {
     flexDirection: 'column',
     background: C.card,
     minHeight: 0,
+    isolation: 'isolate',
+    contain: 'paint',
   },
   todosPageHeader: {
     display: 'flex',
@@ -1777,6 +1785,8 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     background: C.bg,
+    isolation: 'isolate',
+    contain: 'paint',
   },
   canvasScroll: {
     flex: 1,
@@ -1851,6 +1861,8 @@ const S = {
     position: 'relative',
     overflow: 'hidden',
     background: C.bg,
+    isolation: 'isolate',
+    contain: 'paint',
   },
   sageHeader: {
     display: 'flex',
@@ -2040,6 +2052,8 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     background: C.bg,
+    isolation: 'isolate',
+    contain: 'paint',
   },
   monthHeader: {
     display: 'flex',
