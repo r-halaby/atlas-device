@@ -540,6 +540,7 @@ export default function App() {
           view={sage.view}
           pendingAction={sage.pendingAction}
           error={sage.error}
+          heard={sage.heard}
           projects={projects}
           onConfirm={sage.confirm}
           onCancel={sage.cancel}

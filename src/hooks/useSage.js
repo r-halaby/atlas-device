@@ -24,6 +24,7 @@ export function useSage({ onConfirm } = {}) {
   const [view, setView] = useState('idle');
   const [pendingAction, setPendingAction] = useState(null);
   const [error, setError] = useState(null);
+  const [heard, setHeard] = useState('');
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
 
@@ -55,6 +56,7 @@ export function useSage({ onConfirm } = {}) {
           case 'recording_start':
             setError(null);
             setPendingAction(null);
+            setHeard('');
             setView('recording');
             break;
           case 'recording_end':
@@ -65,20 +67,24 @@ export function useSage({ onConfirm } = {}) {
             break;
           case 'result':
             setPendingAction(msg.action ?? null);
+            setHeard(msg.text ?? '');
             setView('result');
             break;
           case 'ambiguous':
             setPendingAction(msg.action ?? null);
+            setHeard(msg.text ?? '');
             setView('ambiguous');
             break;
           case 'error':
             setError(msg.message ?? 'Didn’t catch that');
+            setHeard('');
             setView('error');
             break;
           case 'dismiss':
             setView('idle');
             setPendingAction(null);
             setError(null);
+            setHeard('');
             break;
           default:
             break;
@@ -119,6 +125,7 @@ export function useSage({ onConfirm } = {}) {
     setView('idle');
     setPendingAction(null);
     setError(null);
+    setHeard('');
   }, [pendingAction, onConfirm, send]);
 
   const cancel = useCallback(() => {
@@ -126,6 +133,7 @@ export function useSage({ onConfirm } = {}) {
     setView('idle');
     setPendingAction(null);
     setError(null);
+    setHeard('');
   }, [send]);
 
   const chooseAmbiguousOption = useCallback((choice) => {
@@ -137,7 +145,8 @@ export function useSage({ onConfirm } = {}) {
     send({ event: 'confirm', action: resolved });
     setView('idle');
     setPendingAction(null);
+    setHeard('');
   }, [pendingAction, onConfirm, send]);
 
-  return { view, pendingAction, error, connected, confirm, cancel, chooseAmbiguousOption };
+  return { view, pendingAction, error, heard, connected, confirm, cancel, chooseAmbiguousOption };
 }
