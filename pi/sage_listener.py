@@ -1,29 +1,32 @@
 """Sage voice-command listener.
 
 Runs on the Pi alongside the React kiosk. Watches GPIO 17 for the dedicated
-Sage button; on hold, captures audio from the INMP441 I2S mic (GPIO 18/19/20);
-on release, sends the audio to Whisper for transcription, then to Claude for
-intent parsing, then pushes the parsed action to the React frontend via a
-local WebSocket on ws://localhost:8765.
+Sage button; on hold, captures audio from a USB microphone; on release, sends
+the audio to Whisper for transcription, then to Claude for intent parsing, then
+pushes the parsed action to the React frontend via a local WebSocket on
+ws://localhost:8765.
 
-HARDWARE PREREQS (verify before wiring):
+HARDWARE PREREQS:
     * GPIO 17: momentary push button to GND, internal pull-up used.
-    * GPIO 18 (BCLK), 19 (LRCLK), 20 (DIN): INMP441 I2S mic.
-    * IMPORTANT: the Waveshare 4" DPI panel takes over ~20 GPIO pins. Cross-
-      check its overlay against pins 17/18/19/20 before soldering — if the
-      panel claims one of these, we need to remap.
+      (No I2S pins needed — USB mic uses the USB bus directly.)
+    * USB microphone plugged into any USB port.
+
+    Run `python3 list_audio_devices.py` to confirm the Pi sees the mic.
+    If sage_listener picks the wrong device, override via:
+        SAGE_AUDIO_DEVICE=<index> python3 sage_listener.py
 
 SOFTWARE PREREQS on the Pi:
-    /boot/firmware/config.txt:
-        dtparam=i2s=on
-        dtoverlay=googlevoicehat-soundcard   # or your INMP441 overlay
     apt:
         python3-pip portaudio19-dev libatlas-base-dev
     pip (see pi/requirements.txt):
-        pyaudio websockets anthropic openai
+        pyaudio websockets anthropic openai gpiozero
 
 RUN (as a systemd service or just plain):
     ANTHROPIC_API_KEY=... OPENAI_API_KEY=... python3 sage_listener.py
+
+    To install as a systemd service so it starts on boot:
+        sudo cp pi/sage.service /etc/systemd/system/
+        sudo systemctl enable --now sage
 
 The React app connects on port 8765; if this process isn't running, the app
 stays in idle forever — Sage overlay never appears.
@@ -54,10 +57,10 @@ SAGE_BUTTON_PIN = 17
 DEBOUNCE_SECONDS = 0.2
 MAX_RECORD_SECONDS = 30
 
-# INMP441 spec: 24-bit samples in a 32-bit slot, mono, LEFT channel.
+# USB mics speak standard PCM; 16-bit 16 kHz mono is what Whisper expects.
 AUDIO_RATE = 16000
 AUDIO_CHUNK = 1024
-AUDIO_FORMAT = pyaudio.paInt32
+AUDIO_FORMAT = pyaudio.paInt16
 AUDIO_CHANNELS = 1
 
 WS_HOST = "localhost"
@@ -108,12 +111,42 @@ async def broadcast(state: SageState, event: dict) -> None:
 
 # ---- Audio ----
 
+def _find_usb_input_index(audio: pyaudio.PyAudio) -> Optional[int]:
+    """Return the device index of the first USB input device, or None.
+
+    Checks SAGE_AUDIO_DEVICE env var first so the operator can pin a specific
+    index when the auto-detection guess is wrong (e.g. two USB mics present).
+    """
+    override = os.environ.get("SAGE_AUDIO_DEVICE", "").strip()
+    if override:
+        try:
+            idx = int(override)
+            info = audio.get_device_info_by_index(idx)
+            if info["maxInputChannels"] > 0:
+                log.info("using SAGE_AUDIO_DEVICE=%d (%s)", idx, info["name"])
+                return idx
+            log.warning("SAGE_AUDIO_DEVICE=%d has no input channels; ignoring", idx)
+        except (ValueError, OSError):
+            log.warning("SAGE_AUDIO_DEVICE=%r is not a valid device index; ignoring", override)
+
+    for i in range(audio.get_device_count()):
+        info = audio.get_device_info_by_index(i)
+        if info["maxInputChannels"] > 0 and "usb" in info["name"].lower():
+            log.info("auto-detected USB mic at index %d (%s)", i, info["name"])
+            return i
+
+    log.warning("no USB mic found; falling back to system default input")
+    return None
+
+
 def _open_stream(state: SageState) -> pyaudio.Stream:
+    device_index = _find_usb_input_index(state.audio)
     return state.audio.open(
         format=AUDIO_FORMAT,
         channels=AUDIO_CHANNELS,
         rate=AUDIO_RATE,
         input=True,
+        input_device_index=device_index,  # None → system default
         frames_per_buffer=AUDIO_CHUNK,
     )
 
