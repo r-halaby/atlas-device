@@ -290,13 +290,14 @@ const IconMenu = ({ size = 14 }) => (
   </svg>
 );
 
-const IconSend = ({ size = 14 }) => (
+const IconMic = ({ size = 14, active = false }) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+    <rect x="5" y="1.5" width="4" height="7" rx="2" stroke={active ? C.red : C.textMedium} strokeWidth="1.3" />
     <path
-      d="M12.2 1.8 L1.6 5.9 L6.1 7.9 L8.1 12.4 Z"
-      stroke={C.textMedium}
+      d="M2.5 6.5 A4.5 4.5 0 0 0 11.5 6.5 M7 11 V12.7"
+      stroke={active ? C.red : C.textMedium}
       strokeWidth="1.3"
-      strokeLinejoin="round"
+      strokeLinecap="round"
       fill="none"
     />
   </svg>
@@ -1158,13 +1159,23 @@ function MonthScreen({ onClose, onPickDay }) {
   );
 }
 
+// The kiosk has no keyboard, so this chat is voice-in only: browser
+// SpeechRecognition, not a text field. `window.SpeechRecognition` is the
+// standard name; `webkitSpeechRecognition` is what Chromium ships it as.
+const SpeechRec =
+  typeof window !== 'undefined'
+    ? window.SpeechRecognition || window.webkitSpeechRecognition
+    : undefined;
+
 // -------------------- Sage chat screen --------------------
-// The swipe-page Sage: type or dictate, canned replies. The hardware-button
-// Sage overlay (SageOverlay + useSage) is a separate flow — this is the
-// ambient in-app chat, that is a Real Model when Atlas Sage endpoints ship.
+// The swipe-page Sage: dictate, canned replies. The hardware-button Sage
+// overlay (SageOverlay + useSage) is a separate flow — this is the ambient
+// in-app chat, that is a Real Model when Atlas Sage endpoints ship.
 function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
   const [draft, setDraft] = useState('');
+  const [micPhase, setMicPhase] = useState('idle'); // idle | listening | thinking
   const [historyOpen, setHistoryOpen] = useState(false);
+  const recRef = useRef(null);
   const sage = MOCK_SAGE;
 
   useEffect(() => {
@@ -1172,10 +1183,52 @@ function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, scrollRef]);
 
-  const submit = (e) => {
-    e.preventDefault();
-    onSend(draft);
+  // Leaving the page must not leave the mic running.
+  useEffect(() => () => recRef.current?.abort?.(), []);
+
+  const stopListening = () => {
+    recRef.current?.abort?.();
+    setMicPhase('idle');
+  };
+
+  const toggleMic = () => {
+    if (micPhase === 'listening') return stopListening();
+    if (micPhase === 'thinking') return;
+
+    if (!SpeechRec) {
+      setDraft('Voice input isn’t supported in this browser');
+      return;
+    }
+
     setDraft('');
+    setMicPhase('listening');
+
+    const rec = new SpeechRec();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const text = Array.from(e.results)
+        .map((r) => r[0].transcript)
+        .join('')
+        .trim();
+      setDraft(text);
+      if (e.results[e.results.length - 1].isFinal && text) {
+        setMicPhase('thinking');
+        onSend(text);
+        setTimeout(() => {
+          setDraft('');
+          setMicPhase('idle');
+        }, 500);
+      }
+    };
+    rec.onerror = (e) => {
+      setMicPhase('idle');
+      setDraft(`Mic error: ${e.error}`);
+    };
+    rec.onend = () => setMicPhase((p) => (p === 'listening' ? 'idle' : p));
+    recRef.current = rec;
+    rec.start();
   };
 
   return (
@@ -1224,17 +1277,24 @@ function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
         )}
       </div>
 
-      <form style={S.composer} onSubmit={submit}>
+      <div style={S.composer}>
         <input
           style={S.composerInput}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask Sage anything..."
+          readOnly
+          placeholder={
+            micPhase === 'listening' ? 'Listening…' : micPhase === 'thinking' ? 'Thinking…' : 'Tap to speak'
+          }
         />
-        <button type="submit" style={S.sendBtn}>
-          <IconSend size={14} />
+        <button
+          type="button"
+          style={{ ...S.sendBtn, ...(micPhase === 'listening' ? S.sendBtnActive : null) }}
+          onClick={toggleMic}
+          aria-label={micPhase === 'listening' ? 'Stop listening' : 'Speak to Sage'}
+        >
+          <IconMic size={14} active={micPhase === 'listening'} />
         </button>
-      </form>
+      </div>
 
       {historyOpen && (
         <>
@@ -2014,6 +2074,9 @@ const S = {
     cursor: 'pointer',
     flexShrink: 0,
     padding: 0,
+  },
+  sendBtnActive: {
+    background: '#fbdad2',
   },
   historyScrim: {
     position: 'absolute',
