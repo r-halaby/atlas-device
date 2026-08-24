@@ -57,8 +57,12 @@ SAGE_BUTTON_PIN = 17
 DEBOUNCE_SECONDS = 0.2
 MAX_RECORD_SECONDS = 30
 
-# USB mics speak standard PCM; 16-bit 16 kHz mono is what Whisper expects.
-AUDIO_RATE = 16000
+# USB mics speak standard PCM, 16-bit mono. Whisper accepts any sample rate
+# in the WAV header (it resamples internally), so we don't need to force one
+# — we just need a rate the hardware will actually open at. Cheap USB codecs
+# (e.g. TI PCM2902-based dongles) are hard-locked to 44.1/48 kHz and reject
+# 16 kHz outright, so 16 kHz is tried first (smaller files) but isn't assumed.
+PREFERRED_RATES = (16000, 44100, 48000)
 AUDIO_CHUNK = 1024
 AUDIO_FORMAT = pyaudio.paInt16
 AUDIO_CHANNELS = 1
@@ -81,6 +85,7 @@ class SageState:
     audio: pyaudio.PyAudio
     stream: Optional[pyaudio.Stream] = None
     frames: list[bytes] | None = None
+    sample_rate: int = PREFERRED_RATES[0]
     recording: bool = False
     processing: bool = False
     last_press_ts: float = 0.0
@@ -139,12 +144,27 @@ def _find_usb_input_index(audio: pyaudio.PyAudio) -> Optional[int]:
     return None
 
 
+def _pick_sample_rate(audio: pyaudio.PyAudio, device_index: Optional[int]) -> int:
+    """Return the first preferred rate the device will actually open at."""
+    kwargs = {"input_channels": AUDIO_CHANNELS, "input_format": AUDIO_FORMAT}
+    if device_index is not None:
+        kwargs["input_device"] = device_index
+    for rate in PREFERRED_RATES:
+        try:
+            if audio.is_format_supported(rate, **kwargs):
+                return rate
+        except ValueError:
+            continue
+    return PREFERRED_RATES[-1]
+
+
 def _open_stream(state: SageState) -> pyaudio.Stream:
     device_index = _find_usb_input_index(state.audio)
+    state.sample_rate = _pick_sample_rate(state.audio, device_index)
     return state.audio.open(
         format=AUDIO_FORMAT,
         channels=AUDIO_CHANNELS,
-        rate=AUDIO_RATE,
+        rate=state.sample_rate,
         input=True,
         input_device_index=device_index,  # None → system default
         frames_per_buffer=AUDIO_CHUNK,
@@ -212,7 +232,7 @@ async def stop_recording_and_process(state: SageState) -> None:
     state.processing = True
     await broadcast(state, {"event": "processing"})
 
-    wav_path = _write_wav(state.frames, state.audio.get_sample_size(AUDIO_FORMAT))
+    wav_path = _write_wav(state.frames, state.audio.get_sample_size(AUDIO_FORMAT), state.sample_rate)
     state.frames = None
 
     try:
@@ -226,9 +246,9 @@ async def stop_recording_and_process(state: SageState) -> None:
         action = await loop.run_in_executor(None, parse_intent, text)
         log.info("action: %s", action)
         if action.get("action") == "ambiguous":
-            await broadcast(state, {"event": "ambiguous", "action": action})
+            await broadcast(state, {"event": "ambiguous", "text": text, "action": action})
         else:
-            await broadcast(state, {"event": "result", "action": action})
+            await broadcast(state, {"event": "result", "text": text, "action": action})
     except Exception as e:
         log.exception("processing failed")
         await broadcast(state, {"event": "error", "message": str(e)})
@@ -240,13 +260,13 @@ async def stop_recording_and_process(state: SageState) -> None:
             pass
 
 
-def _write_wav(frames: list[bytes], sample_width: int) -> str:
+def _write_wav(frames: list[bytes], sample_width: int, sample_rate: int) -> str:
     fd, path = tempfile.mkstemp(prefix="sage_", suffix=".wav")
     os.close(fd)
     with wave.open(path, "wb") as w:
         w.setnchannels(AUDIO_CHANNELS)
         w.setsampwidth(sample_width)
-        w.setframerate(AUDIO_RATE)
+        w.setframerate(sample_rate)
         w.writeframes(b"".join(frames))
     return path
 

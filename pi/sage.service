@@ -6,14 +6,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/atlas-device/pi
-ExecStart=/usr/bin/python3 sage_listener.py
+User=rahmi
+WorkingDirectory=/home/rahmi/atlas-device/pi
+ExecStart=/home/rahmi/atlas-device/pi/.venv/bin/python sage_listener.py
 Restart=on-failure
 RestartSec=5
 
-# API keys — copy /home/pi/atlas-device/pi/sage.env.example to sage.env and fill in.
-EnvironmentFile=/home/pi/atlas-device/pi/sage.env
+# API keys — copy /home/rahmi/atlas-device/pi/sage.env.example to sage.env and fill in.
+EnvironmentFile=/home/rahmi/atlas-device/pi/sage.env
 
 # If a specific USB mic index is needed, override here or in sage.env:
 #   SAGE_AUDIO_DEVICE=1
