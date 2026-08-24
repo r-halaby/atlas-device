@@ -94,6 +94,13 @@ const S = {
     letterSpacing: '-0.3px',
     padding: '0 8px',
   },
+  heardText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: MUTED,
+    textAlign: 'center',
+    padding: '0 8px',
+  },
   actions: {
     display: 'flex',
     gap: 24,
@@ -156,6 +163,7 @@ export default function SageOverlay({
   view,
   pendingAction,
   error,
+  heard,
   projects,
   onConfirm,
   onCancel,
@@ -202,6 +210,7 @@ export default function SageOverlay({
         <>
           <div style={S.body}>
             <div style={S.label}>Confirm</div>
+            {heard && <div style={S.heardText}>“{heard}”</div>}
             <div style={S.resultText}>{describeAction(pendingAction)}</div>
             <div style={S.actions}>
               <div
