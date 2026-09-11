@@ -709,7 +709,10 @@ function PulseScreen({
 
   return (
     <div style={S.pulse}>
-      <div style={S.pageLabel}>Pulse</div>
+      <div style={S.pulseHeader}>
+        <div style={{ ...S.pageLabel, marginBottom: 0 }}>Pulse</div>
+        {USE_CONVEX && <div style={S.liveBadge}><span style={S.liveDot} />Live</div>}
+      </div>
 
       <div style={S.pulseCols}>
         <div style={S.leftCol}>
@@ -1377,6 +1380,29 @@ const S = {
     background: C.bg,
     isolation: 'isolate',
     contain: 'paint',
+  },
+  pulseHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  liveBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 9,
+    fontWeight: 600,
+    color: C.green,
+    letterSpacing: '0.3px',
+    textTransform: 'uppercase',
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: '50%',
+    background: C.green,
+    flexShrink: 0,
   },
   pulseCols: {
     flex: 1,
