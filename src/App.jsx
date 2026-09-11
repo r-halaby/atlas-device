@@ -386,6 +386,7 @@ export default function App() {
 
   const toggleTodo = (todo) => {
     if (!todo) return;
+    if (USE_CONVEX) return; // read-only against production
     if (sageAddedTodos.some((t) => t.todoId === todo.todoId)) {
       setSageAddedTodos((prev) =>
         prev.map((t) => (t.todoId === todo.todoId ? { ...t, completed: !t.completed } : t)),
@@ -597,6 +598,7 @@ export default function App() {
               focusIdx={focusIdx}
               setFocusIdx={setFocusIdx}
               toggleTodo={toggleTodo}
+              readOnly={USE_CONVEX}
               onBack={() => setTodosOpen(false)}
             />
           </div>
@@ -906,6 +908,7 @@ function TodosScreen({
   focusIdx,
   setFocusIdx,
   toggleTodo,
+  readOnly,
   onBack,
 }) {
   const [openMenu, setOpenMenu] = useState(null); // canvas | null
@@ -1010,6 +1013,7 @@ function TodosScreen({
               style={{
                 ...S.todoRow,
                 background: focused ? 'rgba(0,0,0,0.03)' : 'transparent',
+                cursor: readOnly ? 'default' : 'pointer',
               }}
               onClick={() => {
                 setFocusIdx(i);
