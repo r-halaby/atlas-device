@@ -13,12 +13,12 @@ import ClockScreen from './components/ClockScreen.jsx';
 const USE_CONVEX = Boolean(import.meta.env.VITE_CONVEX_URL);
 
 function useConvexTodos() {
-  const todos = useQuery(anyApi.canvasTodos.listOrgTodos) ?? [];
-  const mutate = useMutation(anyApi.canvasTodos.toggleOrgTodo);
-  const toggleTodo = (todo) => {
-    if (!todo) return;
-    mutate({ nodeId: todo.nodeId, todoId: todo.todoId, completed: !todo.completed });
-  };
+  const orgId = import.meta.env.VITE_ORG_ID;
+  const todos = useQuery(
+    anyApi.canvasTodos.listOrgTodosForKiosk,
+    orgId ? { clerkOrgId: orgId } : 'skip',
+  ) ?? [];
+  const toggleTodo = () => {}; // read-only — toggling is disabled in kiosk mode
   return { todos, toggleTodo };
 }
 

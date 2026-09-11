@@ -4,14 +4,12 @@ import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import App from './App.jsx';
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
-const authToken = import.meta.env.VITE_CONVEX_AUTH_TOKEN;
 
 let root = <App />;
 if (convexUrl) {
   const convex = new ConvexReactClient(convexUrl);
-  // M2M JWT minted by scripts/mint-kiosk-token.mjs. The kiosk has no
-  // interactive login, so the token is baked in at deploy time.
-  if (authToken) convex.setAuth(async () => authToken);
+  // No auth needed — kiosk uses listOrgTodosForKiosk which accepts
+  // VITE_ORG_ID directly (Clerk M2M aud:[] is incompatible with Convex JWT).
   root = (
     <ConvexProvider client={convex}>
       <App />
