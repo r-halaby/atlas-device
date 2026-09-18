@@ -98,15 +98,15 @@ const mockData = {
   canvas: {
     workspace: 'Agency',
     projects: [
-      { id: 1, name: 'Project Name' },
-      { id: 2, name: 'Project Name' },
-      { id: 3, name: 'Project Name' },
-      { id: 4, name: 'Project Name' },
-      { id: 5, name: 'Project Name' },
-      { id: 6, name: 'Project Name' },
-      { id: 7, name: 'Project Name' },
-      { id: 8, name: 'Project Name' },
-      { id: 9, name: 'Project Name' },
+      { id: 1, name: 'Brand Refresh' },
+      { id: 2, name: 'Q4 Campaign' },
+      { id: 3, name: 'Website Redesign' },
+      { id: 4, name: 'Product Launch' },
+      { id: 5, name: 'Content Strategy' },
+      { id: 6, name: 'Investor Deck' },
+      { id: 7, name: 'Social Playbook' },
+      { id: 8, name: 'User Research' },
+      { id: 9, name: 'Growth Roadmap' },
     ],
   },
 };
@@ -200,9 +200,9 @@ const SCREEN_DEFAULT = SCREEN_PULSE;
 // is a separate, real-model path; this is the ambient "type to Sage" UI.
 const SAGE_OPENING = [{ id: 0, from: 'sage', intro: true }];
 const SAGE_REPLIES = [
-  'Logged. I’ll track that against the project’s stated intent and flag drift as it appears.',
-  'Noted — I’ve tied that to the current canvas so the decision stays retrievable.',
-  'Classified as scope feedback. It’ll surface in the next digest for the team.',
+  "Logged. I'll track that against the project's stated intent and flag drift as it appears.",
+  "Noted — I've tied that to the current canvas so the decision stays retrievable.",
+  "Classified as scope feedback. It'll surface in the next digest for the team.",
 ];
 
 // Design canvas stays 480; the frame is rendered onto a 720x720 panel via
@@ -267,11 +267,11 @@ const IconChevron = ({ dir = 'right', size = 12 }) => (
   </svg>
 );
 
-const IconPlus = ({ size = 12 }) => (
+const IconPlus = ({ size = 12, color = C.text }) => (
   <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
     <path
       d="M6 2 V10 M2 6 H10"
-      stroke={C.text}
+      stroke={color}
       strokeWidth="1.6"
       strokeLinecap="round"
     />
@@ -290,12 +290,12 @@ const IconMenu = ({ size = 14 }) => (
   </svg>
 );
 
-const IconMic = ({ size = 14, active = false }) => (
+const IconMic = ({ size = 14, active = false, color = C.textMedium }) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
-    <rect x="5" y="1.5" width="4" height="7" rx="2" stroke={active ? C.red : C.textMedium} strokeWidth="1.3" />
+    <rect x="5" y="1.5" width="4" height="7" rx="2" stroke={active ? C.red : color} strokeWidth="1.3" />
     <path
       d="M2.5 6.5 A4.5 4.5 0 0 0 11.5 6.5 M7 11 V12.7"
-      stroke={active ? C.red : C.textMedium}
+      stroke={active ? C.red : color}
       strokeWidth="1.3"
       strokeLinecap="round"
       fill="none"
@@ -416,6 +416,7 @@ export default function App() {
   const touchStartY = useRef(null);
   const canvasScrollRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const wheelAccX = useRef(0);
 
   const sendMessage = (text) => {
     const t = text.trim();
@@ -530,12 +531,24 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [screen, focusIdx, todos, todosOpen, monthOpen, pageTodos.length]);
 
+  const onFrameWheel = (e) => {
+    if (todosOpen || monthOpen) return;
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    wheelAccX.current += e.deltaX;
+    if (Math.abs(wheelAccX.current) >= 80) {
+      setScreen((s) => Math.max(0, Math.min(SCREEN_COUNT - 1, s + Math.sign(wheelAccX.current))));
+      wheelAccX.current = 0;
+    }
+  };
+
   return (
     <div style={S.root}>
       <div
         style={S.frame}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onWheel={onFrameWheel}
+        onDragStart={(e) => e.preventDefault()}
       >
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <SageOverlay
@@ -571,14 +584,13 @@ export default function App() {
                 />
               </div>
               <div style={box(showMain && screen === SCREEN_CANVAS)}>
-                <CanvasScreen scrollRef={canvasScrollRef} />
+                <CanvasScreen />
               </div>
               <div style={box(showMain && screen === SCREEN_SAGE)}>
                 <SageScreen
                   messages={messages}
                   onSend={sendMessage}
                   onNewChat={newChat}
-                  scrollRef={chatScrollRef}
                 />
               </div>
             </>
@@ -877,7 +889,9 @@ function PulseScreen({
                           width: barPx(idx - centerIdx),
                           height: isCenter ? 48 : 40,
                           background: fill,
-                          boxShadow: `0 0 0 2px ${isCenter ? C.text : 'transparent'}`,
+                          boxShadow: isCenter
+                            ? `0 0 0 1px #efefef, 0 0 0 3px ${C.text}`
+                            : '0 0 0 1px transparent, 0 0 0 3px transparent',
                         }}
                       />
                     </div>
@@ -1166,6 +1180,87 @@ function MonthScreen({ onClose, onPickDay }) {
   );
 }
 
+// -------------------- Sage orb --------------------
+// Fibonacci-sphere dot cloud rendered on canvas. Spins continuously around Y;
+// when active (mic open) the whole orb jitters a few pixels each frame.
+function SageOrb({ active, size = 200 }) {
+  const canvasRef = useRef(null);
+  const activeRef = useRef(active);
+  useEffect(() => { activeRef.current = active; }, [active]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    ctx.scale(dpr, dpr);
+
+    const R = size * 0.43;
+    const N = 220;
+    const golden = (1 + Math.sqrt(5)) / 2;
+    const pts = Array.from({ length: N }, (_, i) => {
+      const theta = Math.acos(1 - (2 * (i + 0.5)) / N);
+      const phi = 2 * Math.PI * i / golden;
+      return [
+        Math.sin(theta) * Math.cos(phi),
+        Math.sin(theta) * Math.sin(phi),
+        Math.cos(theta),
+      ];
+    });
+
+    let angle = 0;
+    let lastTime = null;
+    let rafId;
+
+    function render(time) {
+      if (lastTime === null) lastTime = time;
+      const dt = Math.min((time - lastTime) / 1000, 0.05);
+      lastTime = time;
+      angle += dt * 0.35;
+
+      ctx.clearRect(0, 0, size, size);
+
+      const cx = size / 2;
+      const cy = size / 2;
+      const tiltX = 0.4;
+      const jitter = activeRef.current ? 3 : 0;
+      const ox = jitter ? (Math.random() - 0.5) * jitter : 0;
+      const oy = jitter ? (Math.random() - 0.5) * jitter : 0;
+
+      const projected = pts.map(([x, y, z]) => {
+        const x1 = x * Math.cos(angle) + z * Math.sin(angle);
+        const y1 = y;
+        const z1 = -x * Math.sin(angle) + z * Math.cos(angle);
+        const x2 = x1;
+        const y2 = y1 * Math.cos(tiltX) - z1 * Math.sin(tiltX);
+        const z2 = y1 * Math.sin(tiltX) + z1 * Math.cos(tiltX);
+        return { sx: cx + x2 * R + ox, sy: cy + y2 * R + oy, z: z2 };
+      });
+
+      projected.sort((a, b) => a.z - b.z);
+
+      for (const p of projected) {
+        const t = (p.z + 1) / 2;
+        const r = 1 + t * 2.8;
+        const alpha = 0.12 + t * 0.88;
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+        ctx.fill();
+      }
+
+      rafId = requestAnimationFrame(render);
+    }
+
+    rafId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(rafId);
+  }, [size]);
+
+  return <canvas ref={canvasRef} style={{ width: size, height: size, display: 'block' }} />;
+}
+
 // The kiosk has no keyboard, so this chat is voice-in only: browser
 // SpeechRecognition, not a text field. `window.SpeechRecognition` is the
 // standard name; `webkitSpeechRecognition` is what Chromium ships it as.
@@ -1175,22 +1270,10 @@ const SpeechRec =
     : undefined;
 
 // -------------------- Sage chat screen --------------------
-// The swipe-page Sage: dictate, canned replies. The hardware-button Sage
-// overlay (SageOverlay + useSage) is a separate flow — this is the ambient
-// in-app chat, that is a Real Model when Atlas Sage endpoints ship.
-function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
-  const [draft, setDraft] = useState('');
+function SageScreen({ messages, onSend, onNewChat }) {
   const [micPhase, setMicPhase] = useState('idle'); // idle | listening | thinking
-  const [historyOpen, setHistoryOpen] = useState(false);
   const recRef = useRef(null);
-  const sage = MOCK_SAGE;
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, scrollRef]);
-
-  // Leaving the page must not leave the mic running.
   useEffect(() => () => recRef.current?.abort?.(), []);
 
   const stopListening = () => {
@@ -1201,152 +1284,330 @@ function SageScreen({ messages, onSend, onNewChat, scrollRef }) {
   const toggleMic = () => {
     if (micPhase === 'listening') return stopListening();
     if (micPhase === 'thinking') return;
-
-    if (!SpeechRec) {
-      setDraft('Voice input isn’t supported in this browser');
-      return;
-    }
-
-    setDraft('');
+    if (!SpeechRec) return;
     setMicPhase('listening');
-
     const rec = new SpeechRec();
     rec.lang = 'en-US';
     rec.interimResults = true;
     rec.continuous = false;
     rec.onresult = (e) => {
-      const text = Array.from(e.results)
-        .map((r) => r[0].transcript)
-        .join('')
-        .trim();
-      setDraft(text);
+      const text = Array.from(e.results).map((r) => r[0].transcript).join('').trim();
       if (e.results[e.results.length - 1].isFinal && text) {
         setMicPhase('thinking');
         onSend(text);
-        setTimeout(() => {
-          setDraft('');
-          setMicPhase('idle');
-        }, 500);
+        setTimeout(() => setMicPhase('idle'), 500);
       }
     };
-    rec.onerror = (e) => {
-      setMicPhase('idle');
-      setDraft(`Mic error: ${e.error}`);
-    };
+    rec.onerror = () => setMicPhase('idle');
     rec.onend = () => setMicPhase((p) => (p === 'listening' ? 'idle' : p));
     recRef.current = rec;
     rec.start();
   };
 
+  const isActive = micPhase !== 'idle';
+  const lastUser = [...messages].reverse().find((m) => m.from === 'user');
+  const lastSage = [...messages].reverse().find((m) => m.from === 'sage' && !m.intro);
+  const statusText =
+    micPhase === 'listening' ? 'Listening…' :
+    micPhase === 'thinking'  ? 'Thinking…'  : 'Tap to speak';
+
   return (
     <div style={S.sagePage}>
-      <div style={S.sageHeader}>
-        <div style={S.sageIconBtn} onClick={() => setHistoryOpen(true)}>
-          <IconMenu size={14} />
-        </div>
-        <SageMark size={34} />
-        <div style={S.sageTitleBlock}>
-          <div style={S.sageName}>Sage</div>
-          <div style={S.sageTagline}>{sage.tagline}</div>
-        </div>
-        <div style={S.sageIconBtn} onClick={onNewChat}>
-          <IconPlus size={13} />
+      <div style={S.sageTopBar}>
+        <span style={S.sagePageLabel}>Sage</span>
+        <div style={S.sageNewBtn} onClick={onNewChat}>
+          <IconPlus size={11} color="rgba(255,255,255,0.4)" />
         </div>
       </div>
 
-      <div ref={scrollRef} className="kiosk-scroll" style={S.sageThread}>
-        {messages.map((m) =>
-          m.from === 'user' ? (
-            <div key={m.id} style={S.userRow}>
-              <div style={S.userBubble}>{m.text}</div>
-            </div>
-          ) : (
-            <div key={m.id} style={S.sageRow}>
-              <SageMark size={22} />
-              <div style={S.sageBubble}>
-                {m.intro ? (
-                  <>
-                    <div style={S.sageLead}>{sage.intro.lead}</div>
-                    <div style={S.sageListLead}>{sage.intro.listLead}</div>
-                    {sage.intro.bullets.map((b) => (
-                      <div key={b} style={S.sageBullet}>
-                        <span style={S.sageDot} />
-                        <span>{b}</span>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  m.text
-                )}
-              </div>
-            </div>
-          )
-        )}
+      <div style={S.orbWrap}>
+        <SageOrb active={isActive} size={200} />
       </div>
 
-      <div style={S.composer}>
-        <input
-          style={S.composerInput}
-          value={draft}
-          readOnly
-          placeholder={
-            micPhase === 'listening' ? 'Listening…' : micPhase === 'thinking' ? 'Thinking…' : 'Tap to speak'
-          }
+      <div style={S.sageStatusText}>{statusText}</div>
+
+      <div style={S.sageExchange}>
+        {lastUser && <div style={S.sageUserLine}>{lastUser.text}</div>}
+        {lastSage && <div style={S.sageSageLine}>{lastSage.text}</div>}
+      </div>
+
+      <button
+        type="button"
+        style={{ ...S.sageMicBtn, ...(isActive ? S.sageMicBtnActive : {}) }}
+        onClick={toggleMic}
+      >
+        <IconMic size={17} active={micPhase === 'listening'} color="rgba(255,255,255,0.6)" />
+      </button>
+    </div>
+  );
+}
+
+// Card interior — image thumbnail + name row + Open button, matching the reference design.
+// Defined outside CanvasScreen so React doesn't re-create the component on every render.
+function StackCardFace({ name }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: 12 }}>
+      {/* Thumbnail — fills remaining height with subtle inner ring */}
+      <div style={{
+        flex: 1,
+        borderRadius: 14,
+        overflow: 'hidden',
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+      }}>
+        <img
+          src="/canvas-placeholder.png"
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
-        <button
-          type="button"
-          style={{ ...S.sendBtn, ...(micPhase === 'listening' ? S.sendBtnActive : null) }}
-          onClick={toggleMic}
-          aria-label={micPhase === 'listening' ? 'Stop listening' : 'Speak to Sage'}
-        >
-          <IconMic size={14} active={micPhase === 'listening'} />
+      </div>
+      {/* Info row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '0 6px 6px 10px',
+        flexShrink: 0,
+      }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: C.text,
+            letterSpacing: '-0.2px',
+            lineHeight: 1.2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {name}
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 400, color: C.textMuted, marginTop: 2, lineHeight: 1.2 }}>
+            Active · Edited 3h ago
+          </div>
+        </div>
+        <button style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          height: 34,
+          paddingLeft: 14,
+          paddingRight: 10,
+          borderRadius: 999,
+          background: C.text,
+          color: C.card,
+          fontSize: 12,
+          fontWeight: 600,
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+          fontFamily: 'inherit',
+          letterSpacing: '-0.1px',
+        }}>
+          Open
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
+            <path d="M9.5 18L15.5 12L9.5 6" />
+          </svg>
         </button>
       </div>
-
-      {historyOpen && (
-        <>
-          <div style={S.historyScrim} onClick={() => setHistoryOpen(false)} />
-          <div style={S.historyPanel}>
-            <div style={S.historyHead}>
-              <span style={S.historyTitle}>Chat History</span>
-              <span
-                style={S.historyNew}
-                onClick={() => { onNewChat(); setHistoryOpen(false); }}
-              >+ New</span>
-            </div>
-            {sage.history.map((h) => (
-              <div
-                key={h.id}
-                style={S.historyItem}
-                onClick={() => setHistoryOpen(false)}
-              >
-                <div style={S.historyItemTitle}>{h.title}</div>
-                <div style={S.historyItemDate}>{h.date}</div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 }
 
 // -------------------- Canvas screen --------------------
-function CanvasScreen({ scrollRef }) {
+function CanvasScreen() {
+  const projects = mockData.canvas.projects;
+  const n = projects.length;
+
+  // Each card carries a stable key so React keeps the DOM node across renders.
+  // When posIdx (array index) changes, the persisted node's CSS transition fires,
+  // animating mid→front and back→mid simultaneously with the exit card.
+  const STACK_SIZE = 6;
+  const nextKey = useRef(STACK_SIZE);
+  const [cards, setCards] = useState([
+    { key: 0, proj: 0 },
+    { key: 1, proj: 1 },
+    { key: 2, proj: 2 },
+    { key: 3, proj: 3 },
+    { key: 4, proj: 4 },
+    { key: 5, proj: 5 },
+  ]);
+  const [exitCard, setExitCard] = useState(null); // { key, proj, dir }
+  const transitioning = useRef(false);
+  const animDur = useRef(1.0);
+
+  const [dragY, setDragY] = useState(0);
+  const dragStart = useRef(null);
+  const wheelAccY = useRef(0);
+  const wheelMaxDY = useRef(0);
+
+  const SPRING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+  const POS = [
+    'translateX(-50%) scale(1)     translateY(0px)',
+    'translateX(-50%) scale(0.95)  translateY(-20px)',
+    'translateX(-50%) scale(0.905) translateY(-39px)',
+    'translateX(-50%) scale(0.862) translateY(-56px)',
+    'translateX(-50%) scale(0.819) translateY(-71px)',
+    'translateX(-50%) scale(0.778) translateY(-84px)',
+  ];
+
+  const go = (d, dur = 1.0) => {
+    if (transitioning.current) return;
+    transitioning.current = true;
+    wheelAccY.current = 0;
+    wheelMaxDY.current = 0;
+    animDur.current = Math.min(1.4, Math.max(0.55, dur));
+
+    const front = cards[0];
+    setExitCard({ ...front, dir: d });
+
+    if (d === 1) {
+      // Swipe up → next: front exits down; remaining cards shift forward; new card enters at back
+      const newProj = (cards[STACK_SIZE - 1].proj + 1) % n;
+      setCards([...cards.slice(1), { key: nextKey.current++, proj: newProj }]);
+    } else {
+      // Swipe down → prev: front exits up; prev project enters at front; stack shifts back
+      const prevProj = (front.proj - 1 + n) % n;
+      setCards([
+        { key: nextKey.current++, proj: prevProj },
+        { key: nextKey.current++, proj: front.proj },
+        ...cards.slice(1, STACK_SIZE - 1),
+      ]);
+    }
+  };
+
+  const onExitEnd = () => {
+    setExitCard(null);
+    transitioning.current = false;
+  };
+
+  const onPointerDown = (e) => {
+    if (transitioning.current) return;
+    dragStart.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragStart.current) return;
+    const dy = e.clientY - dragStart.current.y;
+    const dx = e.clientX - dragStart.current.x;
+    if (Math.abs(dy) > Math.abs(dx)) setDragY(dy);
+  };
+
+  const onPointerUp = (e) => {
+    if (!dragStart.current) return;
+    const dy = e.clientY - dragStart.current.y;
+    const dx = e.clientX - dragStart.current.x;
+    const elapsed = Math.max(Date.now() - dragStart.current.t, 16);
+    dragStart.current = null;
+    setDragY(0);
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 36 * SCALE) {
+      e.stopPropagation();
+      const velocity = Math.abs(dy) / elapsed;
+      go(dy < 0 ? 1 : -1, 0.12 / velocity);
+    }
+  };
+
+  const onWheel = (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.stopPropagation();
+    wheelMaxDY.current = Math.max(wheelMaxDY.current, Math.abs(e.deltaY));
+    wheelAccY.current += e.deltaY;
+    if (Math.abs(wheelAccY.current) >= 80) {
+      const dur = 8 / Math.max(wheelMaxDY.current, 1);
+      go(Math.sign(wheelAccY.current), dur);
+    }
+  };
+
+  const frontProj = cards[0]?.proj ?? 0;
+  const dragOffset = !exitCard && dragY !== 0
+    ? Math.max(-80, Math.min(80, dragY * 0.35)) : 0;
+
   return (
-    <div style={S.canvas}>
+    <div style={S.canvas} onWheel={onWheel}>
+      <style>{`
+        @keyframes csExitDown {
+          from { transform: translateX(-50%) scale(1) translateY(0px); }
+          to   { transform: translateX(-50%) scale(1) translateY(420px); }
+        }
+        @keyframes csExitUp {
+          from { transform: translateX(-50%) scale(1) translateY(0px); }
+          to   { transform: translateX(-50%) scale(1) translateY(-420px); }
+        }
+      `}</style>
+
       <div style={S.pageLabel}>Canvases</div>
-      <div ref={scrollRef} className="kiosk-scroll" style={S.canvasScroll}>
-        <div style={S.grid}>
-          {mockData.canvas.projects.map((p, i) => (
-            <div key={p.id} style={S.projectCard}>
-              <div style={S.thumb}>
-                <ProjectThumb seed={i} />
-              </div>
-              <div style={S.projectName}>{p.name}</div>
-              <div style={S.projectMeta}>Active • Edited 3h ago</div>
+
+      <div style={S.stackWrap}>
+        <div
+          style={S.cardStack}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          {/* Exit card — detached from the stack array; plays keyframe then unmounts */}
+          {exitCard && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                width: 420,
+                height: 252,
+                borderRadius: '18px 18px 0 0',
+                border: `1px solid ${C.border}`,
+                borderBottom: 'none',
+                overflow: 'hidden',
+                display: 'flex',
+                boxSizing: 'border-box',
+                padding: 4,
+                background: C.card,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                zIndex: 10,
+                animation: `${exitCard.dir === 1 ? 'csExitDown' : 'csExitUp'} ${animDur.current}s ${SPRING} forwards`,
+              }}
+              onAnimationEnd={onExitEnd}
+            >
+              <StackCardFace name={projects[exitCard.proj].name} />
             </div>
-          ))}
+          )}
+
+          {/* Stack cards — keyed so DOM nodes persist; CSS transition fires on posIdx change */}
+          {cards.map((card, i) => {
+            const transform = i === 0 && dragOffset !== 0
+              ? `translateX(-50%) scale(1) translateY(${dragOffset}px)`
+              : POS[i];
+            return (
+              <div
+                key={card.key}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: '50%',
+                  width: 420,
+                  height: 252,
+                  borderRadius: '18px 18px 0 0',
+                  border: `1px solid ${C.border}`,
+                  borderBottom: 'none',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  boxSizing: 'border-box',
+                  padding: 4,
+                  background: C.card,
+                  boxShadow: i === 0
+                    ? '0 8px 32px rgba(0,0,0,0.14)'
+                    : `0 ${Math.max(2, 6 - i)}px ${Math.max(4, 20 - i * 4)}px rgba(0,0,0,${(0.08 - i * 0.01).toFixed(2)})`,
+                  zIndex: STACK_SIZE - i,
+                  transform,
+                  transition: `transform ${animDur.current}s ${SPRING}`,
+                  willChange: 'transform',
+                }}
+              >
+                <StackCardFace name={projects[card.proj].name} />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1421,6 +1682,7 @@ const S = {
     // manipulation removes the 300ms double-tap zoom wait so single taps
     // register instantly. Child scrollables override with pan-y as needed.
     touchAction: 'manipulation',
+    cursor: USE_CONVEX ? 'none' : 'default',
   },
 
   pageLabel: {
@@ -1884,7 +2146,7 @@ const S = {
     // The ring is a spread shadow, so it sits 2px outside the block instead of
     // eating into it, and costs no layout. Every bar carries one at full spread
     // and only its color animates, so it fades in as the block grows.
-    boxShadow: '0 0 0 2px transparent',
+    boxShadow: '0 0 0 1px transparent, 0 0 0 3px transparent',
     transition:
       'width 200ms ease, height 200ms ease, background 200ms ease, box-shadow 200ms ease',
     flexShrink: 0,
@@ -1894,59 +2156,29 @@ const S = {
   canvas: {
     width: '100%',
     height: '100%',
-    padding: 14,
-    paddingBottom: 24,
+    padding: '14px 14px 0',
     display: 'flex',
     flexDirection: 'column',
-    background: C.bg,
+    background: '#ffffff',
     isolation: 'isolate',
     contain: 'paint',
   },
-  canvasScroll: {
+  stackWrap: {
     flex: 1,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    paddingRight: 2,
-    WebkitOverflowScrolling: 'touch',
-    touchAction: 'pan-y',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    columnGap: 10,
-    rowGap: 14,
-  },
-  projectCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
-    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'visible',
   },
-  thumb: {
-    width: '100%',
-    aspectRatio: '5 / 3',
-    borderRadius: 8,
-    background: '#efefef',
-    overflow: 'hidden',
+  cardStack: {
+    position: 'relative',
+    width: 420,
+    height: 252,
+    touchAction: 'none',
+    overflow: 'visible',
+    flexShrink: 0,
   },
-  projectName: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: C.text,
-    letterSpacing: '-0.2px',
-    lineHeight: 1.1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  projectMeta: {
-    fontSize: 9,
-    fontWeight: 500,
-    color: C.textMuted,
-    marginTop: -2,
-    lineHeight: 1.1,
-  },
-
   // ---- Dots ----
   dots: {
     position: 'absolute',
@@ -1968,197 +2200,99 @@ const S = {
   sagePage: {
     width: '100%',
     height: '100%',
-    padding: 14,
-    paddingBottom: 24,
     display: 'flex',
     flexDirection: 'column',
-    position: 'relative',
-    overflow: 'hidden',
-    background: C.bg,
+    alignItems: 'center',
+    background: '#000',
     isolation: 'isolate',
     contain: 'paint',
+    overflow: 'hidden',
   },
-  sageHeader: {
+  sageTopBar: {
+    width: '100%',
     display: 'flex',
     alignItems: 'center',
-    gap: 9,
-    paddingBottom: 10,
-    borderBottom: `1px solid ${C.border}`,
+    justifyContent: 'space-between',
+    padding: '14px 14px 0',
     flexShrink: 0,
   },
-  sageIconBtn: {
+  sagePageLabel: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: '-0.1px',
+  },
+  sageNewBtn: {
     width: 22,
     height: 22,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    flexShrink: 0,
   },
-  sageTitleBlock: { flex: 1, minWidth: 0 },
-  sageName: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: C.text,
-    letterSpacing: '-0.3px',
-    lineHeight: 1.15,
+  orbWrap: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sageTagline: {
-    fontSize: 9.5,
+  sageStatusText: {
+    fontSize: 10.5,
     fontWeight: 500,
-    color: C.textMuted,
-    lineHeight: 1.2,
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: '0.1px',
+    flexShrink: 0,
+    marginBottom: 14,
+  },
+  sageExchange: {
+    width: '100%',
+    padding: '0 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    flexShrink: 0,
+    marginBottom: 18,
+    maxHeight: 72,
+    overflow: 'hidden',
+  },
+  sageUserLine: {
+    fontSize: 10.5,
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'right',
+    lineHeight: 1.4,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  sageThread: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    overscrollBehavior: 'contain',
-    touchAction: 'pan-y',
-    padding: '12px 0',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  sageRow: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 8,
-    flexShrink: 0,
-  },
-  sageBubble: {
-    flex: 1,
-    minWidth: 0,
-    background: '#ededed',
-    borderRadius: 12,
-    padding: '10px 11px',
-    fontSize: 11,
+  sageSageLine: {
+    fontSize: 10.5,
     fontWeight: 500,
-    lineHeight: 1.45,
-    color: C.textMedium,
-  },
-  sageLead: { marginBottom: 8 },
-  sageListLead: { marginBottom: 5 },
-  sageBullet: {
-    display: 'flex',
-    gap: 7,
-    paddingLeft: 2,
-    marginBottom: 4,
-  },
-  sageDot: {
-    width: 3,
-    height: 3,
-    borderRadius: '50%',
-    background: '#b4b4b4',
-    flexShrink: 0,
-    marginTop: 6,
-  },
-  userRow: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    flexShrink: 0,
-  },
-  userBubble: {
-    maxWidth: '78%',
-    background: C.text,
-    color: '#ffffff',
-    borderRadius: 12,
-    padding: '9px 11px',
-    fontSize: 11,
-    fontWeight: 500,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'left',
     lineHeight: 1.4,
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
   },
-  composer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: '#ededed',
-    borderRadius: 12,
-    padding: '6px 6px 6px 12px',
-    flexShrink: 0,
-  },
-  composerInput: {
-    flex: 1,
-    minWidth: 0,
-    border: 'none',
-    outline: 'none',
-    background: 'transparent',
-    fontSize: 11.5,
-    fontWeight: 500,
-    color: C.text,
-    fontFamily: 'inherit',
-  },
-  sendBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    background: '#e0e0e0',
-    border: 'none',
+  sageMicBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.12)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
     flexShrink: 0,
+    marginBottom: 24,
     padding: 0,
   },
-  sendBtnActive: {
-    background: '#fbdad2',
-  },
-  historyScrim: {
-    position: 'absolute',
-    inset: 0,
-    background: 'rgba(0,0,0,0.18)',
-    zIndex: 8,
-  },
-  historyPanel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: 210,
-    zIndex: 9,
-    background: C.card,
-    borderRight: `1px solid ${C.border}`,
-    padding: 14,
-    overflowY: 'auto',
-  },
-  historyHead: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 10,
-    borderBottom: `1px solid ${C.border}`,
-  },
-  historyTitle: { fontSize: 12, fontWeight: 500, color: C.textMuted },
-  historyNew: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: C.text,
-    cursor: 'pointer',
-  },
-  historyItem: {
-    padding: '10px 0',
-    borderBottom: '1px solid #f0f0f0',
-    cursor: 'pointer',
-  },
-  historyItemTitle: {
-    fontSize: 11,
-    fontWeight: 500,
-    color: C.text,
-    lineHeight: 1.25,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  historyItemDate: {
-    marginTop: 3,
-    fontSize: 9.5,
-    fontWeight: 500,
-    color: C.textMuted,
+  sageMicBtnActive: {
+    background: 'rgba(229,42,5,0.25)',
+    border: '1px solid rgba(229,42,5,0.45)',
   },
 
   // ---- Month page ----
