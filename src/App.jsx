@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, X, Menu, Mic, LayoutGrid, List, Layers } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
 import { anyApi } from 'convex/server';
 import { MOCK_TODOS, MOCK_PROJECTS, MOCK_TIMER, MOCK_NOTES, MOCK_SAGE } from './mock/mockData.js';
@@ -156,8 +157,7 @@ const DAY_HEALTH = {
 };
 
 const HEALTH_GRADIENTS = {
-  healthy:
-    'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #d6f7e6 55%, #7ee9b0 85%, #00db75 105%)',
+  healthy: null, // image-backed — set via backgroundImage below
   strained:
     'linear-gradient(105deg, #ffffff 0%, #ffffff 22%, #fff2c4 55%, #ffe07a 85%, #fdd33b 105%)',
   critical:
@@ -239,68 +239,27 @@ function barPx(offsetFromCenter) {
   return BAR_WIDTHS_BY_DIST[dist] ?? BAR_WIDTHS_BY_DIST[BAR_WIDTHS_BY_DIST.length - 1];
 }
 
-// -------------------- Tiny inline icons --------------------
-const IconChevron = ({ dir = 'right', size = 12 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 12 12"
-    fill="none"
-    style={{
-      transform:
-        dir === 'left'
-          ? 'rotate(180deg)'
-          : dir === 'down'
-            ? 'rotate(90deg)'
-            : 'none',
-      display: 'block',
-    }}
-  >
-    <path
-      d="M4 2 L8 6 L4 10"
-      stroke={C.text}
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
-    />
-  </svg>
-);
+// -------------------- Lucide icon wrappers --------------------
+const IconChevron = ({ dir = 'right', size = 12 }) => {
+  if (dir === 'left')  return <ChevronLeft  size={size} color={C.text} strokeWidth={1.8} />;
+  if (dir === 'down')  return <ChevronDown  size={size} color={C.text} strokeWidth={1.8} />;
+  return                      <ChevronRight size={size} color={C.text} strokeWidth={1.8} />;
+};
 
 const IconPlus = ({ size = 12, color = C.text }) => (
-  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
-    <path
-      d="M6 2 V10 M2 6 H10"
-      stroke={color}
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
+  <Plus size={size} color={color} strokeWidth={1.8} />
 );
 
 const IconX = ({ size = 12 }) => (
-  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
-    <path d="M3 3 L9 9 M9 3 L3 9" stroke={C.text} strokeWidth="1.6" strokeLinecap="round" />
-  </svg>
+  <X size={size} color={C.text} strokeWidth={1.8} />
 );
 
 const IconMenu = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
-    <path d="M2 4 H12 M2 7 H9 M2 10 H6" stroke={C.text} strokeWidth="1.6" strokeLinecap="round" />
-  </svg>
+  <Menu size={size} color={C.text} strokeWidth={1.8} />
 );
 
 const IconMic = ({ size = 14, active = false, color = C.textMedium }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
-    <rect x="5" y="1.5" width="4" height="7" rx="2" stroke={active ? C.red : color} strokeWidth="1.3" />
-    <path
-      d="M2.5 6.5 A4.5 4.5 0 0 0 11.5 6.5 M7 11 V12.7"
-      stroke={active ? C.red : color}
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      fill="none"
-    />
-  </svg>
+  <Mic size={size} color={active ? C.red : color} strokeWidth={1.8} />
 );
 
 // Sage's mark: a dotted cluster on a black disc.
@@ -330,27 +289,16 @@ const SageMark = ({ size = 34 }) => (
   </span>
 );
 
+const IconStack = ({ size = 12 }) => (
+  <Layers size={size} color={C.text} strokeWidth={1.8} />
+);
+
 const IconGrid = ({ size = 12 }) => (
-  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
-    <rect x="1.5" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
-    <rect x="7" y="1.5" width="3.5" height="3.5" rx="0.6" fill={C.text} />
-    <rect x="1.5" y="7" width="3.5" height="3.5" rx="0.6" fill={C.text} />
-    <rect x="7" y="7" width="3.5" height="3.5" rx="0.6" fill={C.text} />
-  </svg>
+  <LayoutGrid size={size} color={C.text} strokeWidth={1.8} />
 );
 
 const IconList = ({ size = 12 }) => (
-  <svg width={size} height={size} viewBox="0 0 12 12" fill="none">
-    <circle cx="2" cy="3" r="0.9" fill={C.text} />
-    <circle cx="2" cy="6" r="0.9" fill={C.text} />
-    <circle cx="2" cy="9" r="0.9" fill={C.text} />
-    <path
-      d="M4.5 3 H10 M4.5 6 H10 M4.5 9 H10"
-      stroke={C.text}
-      strokeWidth="1.2"
-      strokeLinecap="round"
-    />
-  </svg>
+  <List size={size} color={C.text} strokeWidth={1.8} />
 );
 
 // -------------------- Component --------------------
@@ -737,7 +685,13 @@ function PulseScreen({
             style={{
               ...S.card,
               ...S.todayCard,
-              background: HEALTH_GRADIENTS[health.tone],
+              ...(health.tone === 'healthy'
+                ? { backgroundImage: "url('/pulse-ribbon-green.png')", backgroundSize: 'cover', backgroundPosition: 'calc(100% + 100px) center' }
+                : health.tone === 'strained'
+                  ? { backgroundImage: "url('/pulse-ribbon-yellow.png')", backgroundSize: 'cover', backgroundPosition: 'right center' }
+                  : health.tone === 'critical'
+                    ? { backgroundImage: "url('/pulse-ribbon-red.png')", backgroundSize: 'cover', backgroundPosition: 'right center' }
+                    : { background: HEALTH_GRADIENTS[health.tone] }),
             }}
           >
             <div>
@@ -888,7 +842,19 @@ function PulseScreen({
                           ...S.calBar,
                           width: barPx(idx - centerIdx),
                           height: isCenter ? 48 : 40,
-                          background: fill,
+                          ...(d.color === 'green' && !isPast
+                            ? { backgroundImage: "url('/pulse-ribbon-green.png')", backgroundSize: 'cover', backgroundPosition: 'right center' }
+                            : d.color === 'green' && isPast
+                              ? { backgroundImage: "url('/pulse-ribbon-green.png')", backgroundSize: 'cover', backgroundPosition: 'right center', opacity: 0.45 }
+                            : d.color === 'yellow' && !isPast
+                              ? { backgroundImage: "url('/pulse-ribbon-yellow.png')", backgroundSize: 'cover', backgroundPosition: 'right center' }
+                            : d.color === 'yellow' && isPast
+                              ? { backgroundImage: "url('/pulse-ribbon-yellow.png')", backgroundSize: 'cover', backgroundPosition: 'right center', opacity: 0.45 }
+                            : d.color === 'red' && !isPast
+                              ? { backgroundImage: "url('/pulse-ribbon-red.png')", backgroundSize: 'cover', backgroundPosition: 'right center' }
+                            : d.color === 'red' && isPast
+                              ? { backgroundImage: "url('/pulse-ribbon-red.png')", backgroundSize: 'cover', backgroundPosition: 'right center', opacity: 0.45 }
+                              : { background: fill }),
                           boxShadow: isCenter
                             ? `0 0 0 1px #efefef, 0 0 0 3px ${C.text}`
                             : '0 0 0 1px transparent, 0 0 0 3px transparent',
@@ -1405,10 +1371,29 @@ function StackCardFace({ name }) {
           letterSpacing: '-0.1px',
         }}>
           Open
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
-            <path d="M9.5 18L15.5 12L9.5 6" />
-          </svg>
+          <ChevronRight size={14} strokeWidth={2.5} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CanvasGridItem({ project }) {
+  return (
+    <div style={{
+      background: C.card,
+      borderRadius: 12,
+      border: `1px solid ${C.border}`,
+      overflow: 'hidden',
+      cursor: 'pointer',
+    }}>
+      <div style={{ width: '100%', aspectRatio: '4 / 3', overflow: 'hidden' }}>
+        <img src="/canvas-placeholder.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+      <div style={{ padding: '7px 8px 9px' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: C.text, letterSpacing: '-0.1px', lineHeight: 1.25 }}>
+          {project.name}
+        </div>
       </div>
     </div>
   );
@@ -1418,6 +1403,7 @@ function StackCardFace({ name }) {
 function CanvasScreen() {
   const projects = mockData.canvas.projects;
   const n = projects.length;
+  const [view, setView] = useState('stack');
 
   // Each card carries a stable key so React keeps the DOM node across renders.
   // When posIdx (array index) changes, the persisted node's CSS transition fires,
@@ -1436,6 +1422,7 @@ function CanvasScreen() {
   const transitioning = useRef(false);
   const animDur = useRef(1.0);
 
+  const [enterCard, setEnterCard] = useState(null); // prev card animating in from below
   const [dragY, setDragY] = useState(0);
   const dragStart = useRef(null);
   const wheelAccY = useRef(0);
@@ -1458,26 +1445,29 @@ function CanvasScreen() {
     wheelMaxDY.current = 0;
     animDur.current = Math.min(1.4, Math.max(0.55, dur));
 
-    const front = cards[0];
-    setExitCard({ ...front, dir: d });
-
     if (d === 1) {
-      // Swipe up → next: front exits down; remaining cards shift forward; new card enters at back
+      // Forward: front card flies off bottom; next project enters at back
+      const front = cards[0];
+      setExitCard({ ...front, dir: 1 });
       const newProj = (cards[STACK_SIZE - 1].proj + 1) % n;
       setCards([...cards.slice(1), { key: nextKey.current++, proj: newProj }]);
     } else {
-      // Swipe down → prev: front exits up; prev project enters at front; stack shifts back
-      const prevProj = (front.proj - 1 + n) % n;
-      setCards([
-        { key: nextKey.current++, proj: prevProj },
-        { key: nextKey.current++, proj: front.proj },
-        ...cards.slice(1, STACK_SIZE - 1),
-      ]);
+      // Back: prev project enters from below and slides to the front.
+      // The entering card plays csEnterFront; existing cards shift back one slot.
+      const prevProj = (cards[0].proj - 1 + n) % n;
+      const newKey = nextKey.current++;
+      setEnterCard({ key: newKey, proj: prevProj });
+      setCards([{ key: newKey, proj: prevProj }, ...cards.slice(0, STACK_SIZE - 1)]);
     }
   };
 
   const onExitEnd = () => {
     setExitCard(null);
+    transitioning.current = false;
+  };
+
+  const onEnterEnd = () => {
+    setEnterCard(null);
     transitioning.current = false;
   };
 
@@ -1524,21 +1514,37 @@ function CanvasScreen() {
     ? Math.max(-80, Math.min(80, dragY * 0.35)) : 0;
 
   return (
-    <div style={S.canvas} onWheel={onWheel}>
+    <div style={S.canvas} onWheel={view === 'stack' ? onWheel : undefined}>
       <style>{`
         @keyframes csExitDown {
           from { transform: translateX(-50%) scale(1) translateY(0px); }
           to   { transform: translateX(-50%) scale(1) translateY(420px); }
         }
-        @keyframes csExitUp {
-          from { transform: translateX(-50%) scale(1) translateY(0px); }
-          to   { transform: translateX(-50%) scale(1) translateY(-420px); }
+        @keyframes csEnterFront {
+          from { transform: translateX(-50%) scale(1) translateY(420px); }
+          to   { transform: translateX(-50%) scale(1) translateY(0px); }
         }
       `}</style>
 
-      <div style={S.pageLabel}>Canvases</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ ...S.pageLabel, marginBottom: 0 }}>Canvases</div>
+        <div style={{ ...S.viewToggle, background: '#f0f0f0' }}>
+          <div style={{ ...S.viewToggleBtn, background: view === 'stack' ? '#ffffff' : 'transparent', boxShadow: view === 'stack' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }} onClick={() => setView('stack')}>
+            <IconStack size={11} />
+          </div>
+          <div style={{ ...S.viewToggleBtn, background: view === 'list' ? '#ffffff' : 'transparent', boxShadow: view === 'list' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }} onClick={() => setView('list')}>
+            <IconList size={11} />
+          </div>
+        </div>
+      </div>
 
-      <div style={S.stackWrap}>
+      {view === 'list' && (
+        <div className="kiosk-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch', marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, alignContent: 'start' }}>
+          {projects.map(p => <CanvasGridItem key={p.id} project={p} />)}
+        </div>
+      )}
+
+      {view === 'stack' && <div style={S.stackWrap}>
         <div
           style={S.cardStack}
           onPointerDown={onPointerDown}
@@ -1546,7 +1552,7 @@ function CanvasScreen() {
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         >
-          {/* Exit card — detached from the stack array; plays keyframe then unmounts */}
+          {/* Exit card — plays csExitDown then unmounts */}
           {exitCard && (
             <div
               style={{
@@ -1565,11 +1571,38 @@ function CanvasScreen() {
                 background: C.card,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
                 zIndex: 10,
-                animation: `${exitCard.dir === 1 ? 'csExitDown' : 'csExitUp'} ${animDur.current}s ${SPRING} forwards`,
+                animation: `csExitDown ${animDur.current}s ${SPRING} forwards`,
               }}
               onAnimationEnd={onExitEnd}
             >
               <StackCardFace name={projects[exitCard.proj].name} />
+            </div>
+          )}
+
+          {/* Enter card — prev project slides up from below to become the new front */}
+          {enterCard && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                width: 420,
+                height: 252,
+                borderRadius: '18px 18px 0 0',
+                border: `1px solid ${C.border}`,
+                borderBottom: 'none',
+                overflow: 'hidden',
+                display: 'flex',
+                boxSizing: 'border-box',
+                padding: 4,
+                background: C.card,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                zIndex: 10,
+                animation: `csEnterFront ${animDur.current}s ${SPRING} forwards`,
+              }}
+              onAnimationEnd={onEnterEnd}
+            >
+              <StackCardFace name={projects[enterCard.proj].name} />
             </div>
           )}
 
@@ -1609,7 +1642,7 @@ function CanvasScreen() {
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
